@@ -1,0 +1,20 @@
+{
+	"name": "com.chroma.ahapeditor",
+	"version": "0.1.0",
+	"displayName": "AHAP Editor for Unity",
+	"description": "This package contains an editor window script allowing to edit advanced haptic patterns.",
+	"unity": "2021.3",
+	"dependencies": {
+		"com.unity.nuget.newtonsoft-json": "3.0.2"
+	},
+	"keywords": [
+		"haptics",
+		"ahap",
+		"editor"
+	],
+	"category": "Tools",
+	"author": {
+		"name": "Krzysztof Misiewicz",
+		"email": "k.misiewicz97@gmail.com"
+	}
+}

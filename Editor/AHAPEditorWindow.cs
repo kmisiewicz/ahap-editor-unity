@@ -201,9 +201,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
 
         [MenuItem("Window/AHAP Editor")]
-		public static void OpenWindow() => GetWindow<AHAPEditorWindow>("AHAP Editor");
+        public static void OpenWindow()
+        {
+            AHAPEditorWindow window = GetWindow<AHAPEditorWindow>("AHAP Editor");
+            var c = EditorGUIUtility.IconContent("d_HoloLensInputModule Icon", "AHAP Editor");
+            c.text = "AHAP Editor";
+            window.titleContent = c;
+        }
 
-		private void OnGUI()
+        private void OnGUI()
 		{
             float lineHeight = EditorGUIUtility.singleLineHeight;
             float lineSpacing = EditorGUIUtility.standardVerticalSpacing;

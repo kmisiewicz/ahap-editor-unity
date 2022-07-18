@@ -56,15 +56,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {
             eventPoint = null;
-            Rect offsetRect = new Rect(point - offset, offset * 2);
-            if (location == MouseLocation.IntensityPlot && offsetRect.Contains(Intensity))
+            Rect offsetRect = new(point - offset, offset * 2);
+            if (location != MouseLocation.Outside)
             {
-                eventPoint = Intensity;
-                return true;
-            }
-            else if (location == MouseLocation.SharpnessPlot && offsetRect.Contains(Sharpness))
-            {
-                eventPoint = Sharpness;
+                if (location == MouseLocation.IntensityPlot && offsetRect.Contains(Intensity))
+                    eventPoint = Intensity;
+                else if (location == MouseLocation.SharpnessPlot && offsetRect.Contains(Sharpness))
+                    eventPoint = Sharpness;
                 return true;
             }
             return false;
@@ -74,7 +72,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override List<Pattern> ToPatterns()
         {
-            var e = new Event(Time, AHAPFile.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
+            Event e = new(Time, AHAPFile.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
             return new List<Pattern>() { new Pattern(e, null) };
         }
     }
@@ -111,29 +109,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location)
         {
-            if (location == MouseLocation.IntensityPlot)
+            if (location != MouseLocation.Outside)
             {
-                if (IntensityCurve.Count > 2 && (pointToRemove == IntensityCurve.First() || pointToRemove == IntensityCurve.Last()))
+                List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
+                if (curve.Count > 2 && (pointToRemove == curve.First() || pointToRemove == curve.Last()))
                     return false;
-                IntensityCurve.Remove(pointToRemove);
-                return IntensityCurve.Count < 2;
-            }
-            else if (location == MouseLocation.SharpnessPlot)
-            {
-                if (SharpnessCurve.Count > 2 && (pointToRemove == SharpnessCurve.First() || pointToRemove == SharpnessCurve.Last()))
-                    return false;
-                SharpnessCurve.Remove(pointToRemove);
-                return SharpnessCurve.Count < 2;
+                curve.Remove(pointToRemove);
+                return curve.Count < 2;
             }
             return false;
         }
 
         public override List<Pattern> ToPatterns()
         {
-            var list = new List<Pattern>();
+            List<Pattern> list = new();
 
             // Event
-            var e = new Event(Time, AHAPFile.EVENT_CONTINUOUS, IntensityCurve.Last().Time - Time, 1, 0);
+            Event e = new(Time, AHAPFile.EVENT_CONTINUOUS, IntensityCurve.Last().Time - Time, 1, 0);
             list.Add(new Pattern(e, null));
 
             // Parameter curves
@@ -174,30 +166,36 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
     public class AHAPEditorWindow : EditorWindow
 	{
-        private enum SnapMode { None = 0, [InspectorName("0.1")]Tenth = 1, [InspectorName("0.01")] Hundredth = 2, [InspectorName("0.001")] Thousandth = 3 }
+        private enum SnapMode 
+        { 
+            None = 0,
+            [InspectorName("0.1")] Tenth = 1,
+            [InspectorName("0.01")] Hundredth = 2,
+            [InspectorName("0.001")] Thousandth = 3 
+        }
 
         const float hoverOffset = 5;
 
-        Vector2 scrollPosition = Vector2.zero;
+        TextAsset ahapFile;
 		float zoom = 1f;
         float time = 1f;
+        List<VibrationEvent> events = new List<VibrationEvent>();
+        Vector2 scrollPosition = Vector2.zero;
         Vector2 plotSize = Vector2.one;
         float visiblePlotWidth = 1f;
-        int currentEditMode = 0;
+        int editMode = 0;
         string[] editModeNames = new string[] { "Free Move", "Lock Time", "Lock Value" };
-        List<VibrationEvent> events = new List<VibrationEvent>();
+        SnapMode snapMode = SnapMode.None;
         MouseState mouseState = MouseState.Unclicked;
         MouseLocation mouseLocation = MouseLocation.Outside;
-        MouseLocation mouseClickLocation = MouseLocation.Outside;
-        SnapMode snapMode = SnapMode.None;
+        MouseLocation mouseClickLocation = MouseLocation.Outside;        
         Vector2 mouseClickPlotPosition;
         float continuousEventWindowPos;
         EventPoint hoverPoint = null;
         VibrationEvent hoverPointEvent = null;
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
-        float dragMin, dragMax;
-        TextAsset ahapFile;
+        float dragMin, dragMax;        
 
 
         [MenuItem("Window/AHAP Editor")]
@@ -239,23 +237,21 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             #endregion
 
             #region Top UI
-
-            int toplinesTaken = 0;
+                        
             GUILayout.BeginHorizontal();
             ahapFile = EditorGUILayout.ObjectField("AHAP File", ahapFile, typeof(TextAsset), false) as TextAsset;
-            if (ahapFile == null) GUI.enabled = false;
+            if (ahapFile == null) 
+                GUI.enabled = false;
             if (GUILayout.Button("Import", GUILayout.Width(70)))
                 HandleImport();
             GUI.enabled = true;
             GUILayout.Space(50);
             time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField("Time", time), GetLastPointTime()), 0.1f);
             GUILayout.EndHorizontal();
-            toplinesTaken++;
 
             Rect refRect = EditorGUILayout.GetControlRect();
-            Rect selModeRect = EditorGUI.PrefixLabel(refRect, new GUIContent("Edit Mode"));
-            currentEditMode = GUI.SelectionGrid(selModeRect, currentEditMode, editModeNames, editModeNames.Length);
-            toplinesTaken++;
+            Rect editModeRect = EditorGUI.PrefixLabel(refRect, new GUIContent("Edit Mode"));
+            editMode = GUI.SelectionGrid(editModeRect, editMode, editModeNames, editModeNames.Length);
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Save"))
@@ -272,38 +268,35 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 zoom = 1;
             snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
             GUILayout.EndHorizontal();
-            toplinesTaken++;
 
             #endregion
 
-            Rect bottomLine = new Rect(refRect);
-            bottomLine.position = new Vector2(refRect.x, position.height - lineWithSpacing);
-            int bottomLinesTaken = 1;
+            #region Plot area
 
-            // Plot area            	
+            Rect bottomLine = new(new Vector2(refRect.x, position.height - lineWithSpacing), refRect.size);
+            int toplinesTaken = 3;
+            int bottomLinesTaken = 1;         	
 			float topOffset = toplinesTaken * lineWithSpacing + lineSpacing;			
 			float bottomOffset = bottomLinesTaken * lineWithSpacing + lineSpacing;
             Rect plotArea = position;
             plotArea.position = new Vector2(refRect.x, topOffset);
 			plotArea.width -= plotArea.x * 2 + 10;
 			plotArea.height -= plotArea.y + bottomOffset;
-			Rect intensityPlotRect = new Rect(plotArea);
-			GUIStyle plotTitleStyle = new GUIStyle(GUI.skin.label);
+			Rect intensityPlotRect = new(plotArea);
+			GUIStyle plotTitleStyle = new(GUI.skin.label);
 			plotTitleStyle.alignment = TextAnchor.UpperCenter;
 			plotTitleStyle.fontStyle = FontStyle.Bold;
 			GUI.Label(intensityPlotRect, "Intensity", plotTitleStyle);
 			intensityPlotRect.height -= lineHeight;
 			intensityPlotRect.height /= 2;
-			Rect sharpnessPlotRect = new Rect(intensityPlotRect);
+			Rect sharpnessPlotRect = new(intensityPlotRect);
 			sharpnessPlotRect.position += new Vector2(0, sharpnessPlotRect.height);
 			GUI.Label(sharpnessPlotRect, "Sharpness", plotTitleStyle);
-			var plotOffset = new Vector2(35, lineWithSpacing);
-            intensityPlotRect.position += plotOffset;
-			intensityPlotRect.width -= plotOffset.x;
-			intensityPlotRect.height -= plotOffset.y + lineWithSpacing;
-			sharpnessPlotRect.position += plotOffset;
-			sharpnessPlotRect.width -= plotOffset.x;
-			sharpnessPlotRect.height -= plotOffset.y + lineWithSpacing;
+            Vector2 plotOffset = new(35, lineWithSpacing);
+            intensityPlotRect = new(intensityPlotRect.position + plotOffset,
+                new Vector2(intensityPlotRect.width - 35, intensityPlotRect.height - plotOffset.y * 2));
+            sharpnessPlotRect = new(sharpnessPlotRect.position + plotOffset,
+                new Vector2(sharpnessPlotRect.width - 35, sharpnessPlotRect.height - plotOffset.y * 2));
             visiblePlotWidth = intensityPlotRect.width;
 
             // Y axis labels and horizontal lines
@@ -314,73 +307,80 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 else if (yAxisLabelCount >= 3 && yAxisLabelCount < 5) yAxisLabelCount = 3;
             }
             float verticalAxisLabelInterval = 1f / (yAxisLabelCount - 1);
-            Rect rect = new Rect(refRect);
-            rect.width = 30;
-            rect.position = new Vector2(rect.position.x, intensityPlotRect.position.y - (lineHeight / 2f));
-            Rect rect2 = new Rect(rect);
-            rect2.position = new Vector2(rect2.position.x, sharpnessPlotRect.position.y - (lineHeight / 2f));
-            Vector2 yAxisLabelOffset = new Vector2(0, intensityPlotRect.height / (yAxisLabelCount - 1));
-            GUIStyle yAxisLabelStyle = new GUIStyle(GUI.skin.label);
+            Rect intensityYAxisLabelRect = new(refRect);
+            intensityYAxisLabelRect.width = 30;
+            intensityYAxisLabelRect.position = new Vector2(intensityYAxisLabelRect.x, intensityPlotRect.y - (lineHeight / 2f));
+            Rect sharpnessYAxisLabelRect = new(intensityYAxisLabelRect);
+            sharpnessYAxisLabelRect.position = new Vector2(sharpnessYAxisLabelRect.x, sharpnessPlotRect.y - (lineHeight / 2f));
+            Vector2 yAxisLabelOffset = new(0, intensityPlotRect.height / (yAxisLabelCount - 1));
+            GUIStyle yAxisLabelStyle = new(GUI.skin.label);
             yAxisLabelStyle.alignment = TextAnchor.MiddleRight;
             Handles.color = Color.gray;
             for (int i = 0; i < yAxisLabelCount; i++)
             {
                 string label = (1 - i * verticalAxisLabelInterval).ToString("0.##");
 
-                GUI.Label(rect, label, yAxisLabelStyle);
-                Handles.DrawLine(new Vector3(intensityPlotRect.x, rect.y + lineHalfHeight),
-                    new Vector3(intensityPlotRect.x + intensityPlotRect.width, rect.y + lineHalfHeight));
-                rect.position += yAxisLabelOffset;
+                GUI.Label(intensityYAxisLabelRect, label, yAxisLabelStyle);
+                Handles.DrawLine(new Vector3(intensityPlotRect.x, intensityYAxisLabelRect.y + lineHalfHeight),
+                    new Vector3(intensityPlotRect.x + intensityPlotRect.width, intensityYAxisLabelRect.y + lineHalfHeight));
+                intensityYAxisLabelRect.position += yAxisLabelOffset;
 
-                GUI.Label(rect2, label, yAxisLabelStyle);
-                Handles.DrawLine(new Vector3(sharpnessPlotRect.x, rect2.y + lineHalfHeight),
-                    new Vector3(sharpnessPlotRect.x + sharpnessPlotRect.width, rect2.y + lineHalfHeight));
-                rect2.position += yAxisLabelOffset;
+                GUI.Label(sharpnessYAxisLabelRect, label, yAxisLabelStyle);
+                Handles.DrawLine(new Vector3(sharpnessPlotRect.x, sharpnessYAxisLabelRect.y + lineHalfHeight),
+                    new Vector3(sharpnessPlotRect.x + sharpnessPlotRect.width, sharpnessYAxisLabelRect.y + lineHalfHeight));
+                sharpnessYAxisLabelRect.position += yAxisLabelOffset;
             }
 
-            Rect scrollArea = new Rect(plotArea);
-            scrollArea.position += plotOffset;
-            scrollArea.width -= plotOffset.x;
-            scrollArea.height -= plotOffset.y;
-            GUIStyle xAxisLabelStyle = new GUIStyle(GUI.skin.label);
+            Rect scrollArea = new(plotArea.position + plotOffset, plotArea.size - plotOffset);
+            GUIStyle xAxisLabelStyle = new(GUI.skin.label);
             xAxisLabelStyle.alignment = TextAnchor.UpperCenter;
+
+            #endregion
 
             #region Plot scroll
 
-            plotSize.x = scrollArea.width * zoom;
-            plotSize.y = intensityPlotRect.height;
-            scrollPosition = GUI.BeginScrollView(scrollArea, scrollPosition, new Rect(0, 0, plotSize.x, scrollArea.height), true, false, GUI.skin.horizontalScrollbar, GUIStyle.none);
+            plotSize = new Vector2(scrollArea.width * zoom, intensityPlotRect.height);
+            scrollPosition = GUI.BeginScrollView(scrollArea, scrollPosition, new Rect(0, 0, plotSize.x, scrollArea.height),
+                true, false, GUI.skin.horizontalScrollbar, GUIStyle.none);
 
             float sharpnessPlotHeightOffset = sharpnessPlotRect.y - intensityPlotRect.y;
             int xAxisLabelCount = (int)(plotSize.x / 75);
-            var xAxisLabelOffset = new Vector2(plotSize.x / (float)xAxisLabelCount, 0);
-            Rect xAxisLabelRect = new Rect(0, intensityPlotRect.height + lineSpacing, 40, lineHeight);
-            Rect xAxisLabelRect2 = new Rect(0, sharpnessPlotHeightOffset + sharpnessPlotRect.height + lineSpacing, 40, lineHeight);
-            
-            var xAxisLabelMiddleOffset = new Vector2(20, 0);
-            GUI.Label(xAxisLabelRect, "0");
-            xAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
-            GUI.Label(xAxisLabelRect2, "0");
-            xAxisLabelRect2.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
+            Vector2 xAxisLabelOffset = new(plotSize.x / (float)xAxisLabelCount, 0);
+            Rect intensityXAxisLabelRect = new(0, intensityPlotRect.height + lineSpacing, 40, lineHeight);
+            Rect sharpnessXAxisLabelRect = new(0, sharpnessPlotHeightOffset + sharpnessPlotRect.height + lineSpacing, 40, lineHeight);
+
+            Vector2 xAxisLabelMiddleOffset = new (20, 0);
+            GUI.Label(intensityXAxisLabelRect, "0");
+            intensityXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
+            Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, 0),
+                    new Vector3(xAxisLabelOffset.x / 2, intensityPlotRect.height));
+            GUI.Label(sharpnessXAxisLabelRect, "0");
+            sharpnessXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
+            Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset),
+                    new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
             for (int i = 1; i < xAxisLabelCount; i++)
             {
                 string label = (i * time / xAxisLabelCount).ToString("#0.###");
 
-                GUI.Label(xAxisLabelRect, label, xAxisLabelStyle);
+                GUI.Label(intensityXAxisLabelRect, label, xAxisLabelStyle);
                 Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x, 0),
                     new Vector3(i * xAxisLabelOffset.x, intensityPlotRect.height));
-                xAxisLabelRect.position += xAxisLabelOffset;
+                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, 0),
+                    new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, intensityPlotRect.height));
+                intensityXAxisLabelRect.position += xAxisLabelOffset;
 
-                GUI.Label(xAxisLabelRect2, label, xAxisLabelStyle);
+                GUI.Label(sharpnessXAxisLabelRect, label, xAxisLabelStyle);
                 Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x, sharpnessPlotHeightOffset),
                     new Vector3(i * xAxisLabelOffset.x, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
-                xAxisLabelRect2.position += xAxisLabelOffset;
+                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset),
+                    new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
+                sharpnessXAxisLabelRect.position += xAxisLabelOffset;
             }
-            xAxisLabelRect.position -= xAxisLabelMiddleOffset;
-            xAxisLabelRect2.position -= xAxisLabelMiddleOffset;
+            intensityXAxisLabelRect.position -= xAxisLabelMiddleOffset;
+            sharpnessXAxisLabelRect.position -= xAxisLabelMiddleOffset;
             xAxisLabelStyle.alignment = TextAnchor.UpperRight;
-            GUI.Label(xAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
-            GUI.Label(xAxisLabelRect2, time.ToString("#0.##"), xAxisLabelStyle);
+            GUI.Label(intensityXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
+            GUI.Label(sharpnessXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
                         
             Handles.color = Color.white;
             Handles.DrawAAPolyLine(5f, new Vector3(1, 1), new Vector3(plotSize.x - 1, 1), 
@@ -619,7 +619,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                 dragMax = ((ContinuousEvent)nextEvent).IntensityCurve.First().Time - 0.001f;
                         }
                     }
-                    if (currentEditMode == 1)
+                    if (editMode == 1)
                         dragMin = dragMax = draggedPoint.Time;
 
                     mouseClickLocation = mouseLocation;
@@ -629,7 +629,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     if (mouseLocation == mouseClickLocation)
                     {
                         draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
-                        draggedPoint.Value = currentEditMode != 2 ? Mathf.Clamp(plotPosition.y, 0, 1) : draggedPoint.Value;
+                        draggedPoint.Value = editMode != 2 ? Mathf.Clamp(plotPosition.y, 0, 1) : draggedPoint.Value;
                         if (draggedPointEvent is TransientEvent te)
                             te.Time = te.Intensity.Time = te.Sharpness.Time = draggedPoint.Time;
                         else if (draggedPointEvent is ContinuousEvent ce)

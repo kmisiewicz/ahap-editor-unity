@@ -56,14 +56,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {
             eventPoint = null;
-            Rect offsetRect = new(point - offset, offset * 2);
             if (location != MouseLocation.Outside)
             {
+                Rect offsetRect = new(point - offset, offset * 2);
                 if (location == MouseLocation.IntensityPlot && offsetRect.Contains(Intensity))
+                {
                     eventPoint = Intensity;
+                    return true;
+                }
                 else if (location == MouseLocation.SharpnessPlot && offsetRect.Contains(Sharpness))
+                {
                     eventPoint = Sharpness;
-                return true;
+                    return true;
+                }
             }
             return false;
         }
@@ -94,14 +99,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {
             eventPoint = null;
-            Rect offsetRect = new Rect(point - offset, offset * 2);
-            List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
-            foreach (EventPoint ep in curve)
+            if (location != MouseLocation.Outside)
             {
-                if (offsetRect.Contains(ep))
+                Debug.Log(1);
+                Rect offsetRect = new(point - offset, offset * 2);
+                Debug.Log(offsetRect);
+                List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
+                Debug.Log(curve.Count);
+                foreach (EventPoint ep in curve)
                 {
-                    eventPoint = ep;
-                    return true;
+                    if (offsetRect.Contains(ep))
+                    {
+                        eventPoint = ep;
+                        return true;
+                    }
                 }
             }
             return false;
@@ -177,6 +188,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float hoverOffset = 5;
 
         TextAsset ahapFile;
+        AudioClip audioClip;
 		float zoom = 1f;
         float time = 1f;
         List<VibrationEvent> events = new List<VibrationEvent>();
@@ -195,7 +207,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         VibrationEvent hoverPointEvent = null;
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
-        float dragMin, dragMax;        
+        float dragMin, dragMax;
+
+        bool referenceClipVisible = false;
+        float lastAudioClipPaintedZoom = 1f;
+        Texture2D audioClipTexture;
+        string lastAudioClipName = "None";
+        bool normalize, wasNormalized;
 
 
         [MenuItem("Window/AHAP Editor")]
@@ -246,7 +264,17 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 HandleImport();
             GUI.enabled = true;
             GUILayout.Space(50);
+            audioClip = EditorGUILayout.ObjectField("Reference audio clip", audioClip, typeof(AudioClip), false) as AudioClip;
+            if (audioClip == null)
+                GUI.enabled = false;
+            referenceClipVisible = EditorGUILayout.Toggle("Waveform visible", referenceClipVisible);
+            if (!referenceClipVisible) lastAudioClipPaintedZoom = 0;
+            normalize = EditorGUILayout.Toggle("Normalize waveform", normalize);
+            GUI.enabled = true;
+            GUILayout.Space(50);
             time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField("Time", time), GetLastPointTime()), 0.1f);
+            if (audioClip != null && referenceClipVisible)
+                time = Mathf.Max(time, audioClip.length);
             GUILayout.EndHorizontal();
 
             Rect refRect = EditorGUILayout.GetControlRect();
@@ -349,6 +377,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Rect intensityXAxisLabelRect = new(0, intensityPlotRect.height + lineSpacing, 40, lineHeight);
             Rect sharpnessXAxisLabelRect = new(0, sharpnessPlotHeightOffset + sharpnessPlotRect.height + lineSpacing, 40, lineHeight);
 
+            if (audioClip != null && referenceClipVisible)
+            {
+                if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || audioClip.name != lastAudioClipName || normalize != wasNormalized)
+                {
+                    audioClipTexture = PaintWaveformSpectrum(audioClip, (int)plotSize.x, (int)plotSize.y, new Color(0.05f, 0.9f, 0.05f, 0.2f), normalize);
+                    lastAudioClipPaintedZoom = zoom;
+                    lastAudioClipName = audioClip.name;
+                    wasNormalized = normalize;
+                }
+                GUI.DrawTexture(new Rect(Vector2.zero, plotSize), audioClipTexture, ScaleMode.StretchToFill);
+                GUI.DrawTexture(new Rect(new Vector2(0, sharpnessPlotHeightOffset), plotSize), audioClipTexture, ScaleMode.StretchToFill);
+            }
+
             Vector2 xAxisLabelMiddleOffset = new (20, 0);
             GUI.Label(intensityXAxisLabelRect, "0");
             intensityXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
@@ -407,7 +448,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     Handles.color = new Color(1f, 0.6f, 0.2f);
 
-                    List<Vector3> points = new List<Vector3>();
+                    List<Vector3> points = new();
                     points.Add(new Vector3(continuousEvent.IntensityCurve[0].Time / time * plotSize.x, intensityPlotRect.height, 0));
                     for (int i = 0; i < continuousEvent.IntensityCurve.Count; i++)
                     {
@@ -471,21 +512,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 realPlotPosition = new Vector2(x, y);
                 if (snapMode != SnapMode.None)
                 {
-                    int decimals = 1;
-                    switch (snapMode)
-                    {
-                        case SnapMode.Tenth:
-                            decimals = 1;
-                            break;
-                        case SnapMode.Hundredth:
-                            decimals = 2;
-                            break;
-                        case SnapMode.Thousandth:
-                            decimals = 3;
-                            break;
-                    }
-                    x = (float)Math.Round(x, decimals);
-                    y = (float)Math.Round(y, decimals);
+                    x = (float)Math.Round(x, (int)snapMode);
+                    y = (float)Math.Round(y, (int)snapMode);
                 }
                 plotPosition = new Vector2(x, y);
                 GUI.Label(bottomLine, $"{(mouseLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness")}: x={x}, y={y}");
@@ -677,7 +705,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         private EventPoint GetEventPointOnPosition(Vector2 plotPosition, MouseLocation plot, out VibrationEvent vibrationEvent)
         {
             vibrationEvent = null;
-            Vector2 pointOffset = new Vector2(hoverOffset * time / plotSize.x, hoverOffset / plotSize.y);
+            Vector2 pointOffset = new(hoverOffset * time / plotSize.x, hoverOffset / plotSize.y);
             foreach (var ev in events)
             {
                 if (ev.IsOnPointInEvent(plotPosition, pointOffset, plot, out EventPoint eventPoint))
@@ -719,6 +747,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             AHAPFile file = new();
             file.Metadata = new Metadata();
             file.Pattern = patternList;
+            file.Version = 1;
             return file;
         }
 
@@ -761,39 +790,31 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             if (ahapFile != null)
             {
-                AHAPFile ahap;
                 try
                 {
-                    ahap = JsonConvert.DeserializeObject<AHAPFile>(ahapFile.text);
+                    AHAPFile ahap = JsonConvert.DeserializeObject<AHAPFile>(ahapFile.text);
 
                     if (events != null) events.Clear();
                     else events = new List<VibrationEvent>();
-
-                    time = GetLastPointTime();
 
                     foreach (var patternElement in ahap.Pattern)
                     {
                         Event e = patternElement.Event;
                         if (e != null)
                         {
+                            int index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_INTENSITY);
+                            float intensity = index != -1 ? (float)e.EventParameters[index].ParameterValue : 1;
+                            index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_SHARPNESS);
+                            float sharpness = index != -1 ? (float)e.EventParameters[index].ParameterValue : 0;
                             if (e.EventType == AHAPFile.EVENT_TRANSIENT)
                             {
-                                int intensityIndex = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_INTENSITY);
-                                float intensity = intensityIndex != -1 ? (float)e.EventParameters[intensityIndex].ParameterValue : 1;
-                                int sharpnessIndex = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_SHARPNESS);
-                                float sharpness = sharpnessIndex != -1 ? (float)e.EventParameters[sharpnessIndex].ParameterValue : 0;
                                 events.Add(new TransientEvent((float)e.Time, intensity, sharpness));
                             }
                             else if (e.EventType == AHAPFile.EVENT_CONTINUOUS)
                             {
-                                int intensityIndex = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_INTENSITY);
-                                float intensity = intensityIndex != -1 ? (float)e.EventParameters[intensityIndex].ParameterValue : 1;
-                                int sharpnessIndex = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_SHARPNESS);
-                                float sharpness = sharpnessIndex != -1 ? (float)e.EventParameters[sharpnessIndex].ParameterValue : 0;
-
                                 float t = (float)e.Time;
-                                var intensityPoints = new List<EventPoint>();
-                                var curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t && 
+                                List<EventPoint> intensityPoints = new();
+                                Pattern curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t && 
                                     element.ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY);
                                 while (curve != null)
                                 {
@@ -814,7 +835,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                     intensityPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), intensityPoints.Last().Value));
 
                                 t = (float)e.Time;
-                                var sharpnessPoints = new List<EventPoint>();
+                                List<EventPoint> sharpnessPoints = new();
                                 curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
                                     element.ParameterCurve.ParameterID == AHAPFile.CURVE_SHARPNESS);
                                 while (curve != null)
@@ -835,7 +856,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                 else if (!Mathf.Approximately(sharpnessPoints.Last().Time, (float)(e.Time + e.EventDuration)))
                                     intensityPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), sharpnessPoints.Last().Value));
 
-                                ContinuousEvent ce = new ContinuousEvent();
+                                ContinuousEvent ce = new();
                                 ce.Time = (float)e.Time;
                                 ce.IntensityCurve = intensityPoints;
                                 ce.SharpnessCurve = sharpnessPoints;
@@ -843,13 +864,57 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             }
                         }
                     }
+                    time = GetLastPointTime();
                 }
                 catch (Exception ex)
                 {
                     Debug.LogError($"Error while importing file {ahapFile.name}{Environment.NewLine}{ex.Message}");
-                    return;
                 }                
             }
+        }
+
+        public Texture2D PaintWaveformSpectrum(AudioClip audio, int width, int height, Color color, bool normalize)
+        {
+            Texture2D tex = new(width, height, TextureFormat.RGBA32, false);
+            float[] samples = new float[audio.samples * audio.channels];
+            float[] waveform = new float[width];
+            audio.GetData(samples, 0);
+            int packSize = (samples.Length / width) + 1;
+            int s = 0;
+            float maxValue = 0;
+            for (int i = 0; i < samples.Length; i += packSize)
+            {
+                waveform[s] = Mathf.Abs(samples[i]);
+                maxValue = Mathf.Max(maxValue, waveform[s]);
+                s++;
+            }
+            if (normalize)
+            {
+                for (int x = 0; x < waveform.Length; x++)
+                {
+                    waveform[x] /= maxValue;
+                }
+            }
+
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    tex.SetPixel(x, y, Color.clear);
+                }
+            }
+
+            for (int x = 0; x < waveform.Length; x++)
+            {
+                for (int y = 0; y <= waveform[x] * ((float)height * .75f); y++)
+                {
+                    tex.SetPixel(x, (height / 2) + y, color);
+                    tex.SetPixel(x, (height / 2) - y, color);
+                }
+            }
+            tex.Apply();
+
+            return tex;
         }
     }    
 }

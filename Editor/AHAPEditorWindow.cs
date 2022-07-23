@@ -101,11 +101,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             eventPoint = null;
             if (location != MouseLocation.Outside)
             {
-                Debug.Log(1);
                 Rect offsetRect = new(point - offset, offset * 2);
-                Debug.Log(offsetRect);
                 List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
-                Debug.Log(curve.Count);
                 foreach (EventPoint ep in curve)
                 {
                     if (offsetRect.Contains(ep))

@@ -821,7 +821,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                         t = (float)point.Time;
                                     }
                                     curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
-                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY);
+                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY && element != curve);
                                 }
                                 if (intensityPoints.Count == 0)
                                 {
@@ -843,7 +843,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                         t = (float)point.Time;
                                     }
                                     curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
-                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_SHARPNESS);
+                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_SHARPNESS && element != curve);
                                 }
                                 if (sharpnessPoints.Count == 0)
                                 {

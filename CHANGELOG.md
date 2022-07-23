@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2022-07-23
+### Fixed
+- Importing file with a single point curve where point overlaps with last point of previous curve won't result in infinite loop/memory leak
+- Exporting events with curves with multiples of 16 points won't create unnecessary parameter curve with a single point
+- Removed unwanted logs used for hover detection fix in version 0.2.0
+
 ## [0.2.0] - 2022-07-19
 ### Added
 - Reference audio clip texture on plot

@@ -148,7 +148,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(intensityPoint.Time, intensityPoint.Value));
                 }
             }
-            if (list.Count == 1 || (list.Count > 1 && curve.ParameterCurveControlPoints.Count >= 1))
+            if (list.Count == 1 || (list.Count > 1 && curve.ParameterCurveControlPoints.Count > 1))
                 list.Add(new Pattern(null, curve));
 
             int count = list.Count;
@@ -163,7 +163,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(sharpnessPoint.Time, sharpnessPoint.Value));
                 }
             }
-            if (list.Count == count || (list.Count > count && curve.ParameterCurveControlPoints.Count >= 0))
+            if (list.Count == count || (list.Count > count && curve.ParameterCurveControlPoints.Count > 1))
                 list.Add(new Pattern(null, curve));
 
             return list;

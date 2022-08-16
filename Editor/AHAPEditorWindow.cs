@@ -233,6 +233,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Texture2D audioClipTexture;
         string lastAudioClipName = "None";
         bool normalize, wasNormalized;
+        float renderScale = 1f;
 
 
         [MenuItem("Window/AHAP Editor")]
@@ -290,6 +291,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             referenceClipVisible = EditorGUILayout.Toggle("Waveform visible", referenceClipVisible);
             if (!referenceClipVisible) lastAudioClipPaintedZoom = 0;
             normalize = EditorGUILayout.Toggle("Normalize waveform", normalize);
+            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(new GUIContent("Waveform render scale"), renderScale), 0.1f, 2f);
             GUI.enabled = true;
             GUILayout.Space(50);
             time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField("Time", time), GetLastPointTime()), 0.1f);
@@ -401,7 +403,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || audioClip.name != lastAudioClipName || normalize != wasNormalized)
                 {
-                    audioClipTexture = PaintWaveformSpectrum(audioClip, (int)plotSize.x, (int)plotSize.y, waveformColor, normalize);
+                    audioClipTexture = PaintWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), waveformColor, normalize);
                     lastAudioClipPaintedZoom = zoom;
                     lastAudioClipName = audioClip.name;
                     wasNormalized = normalize;
@@ -741,20 +743,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         private float GetLastPointTime()
         {
             float lastPointTime = 0;
+            float t;
             foreach (var ev in events)
             {
                 if (ev is TransientEvent)
-                {
-                    float t = ev.Time;
-                    if (t > lastPointTime)
-                        lastPointTime = t;
-                }
+                    t = ev.Time;
                 else
-                {
-                    float t = ((ContinuousEvent)ev).IntensityCurve.Last().Time;
-                    if (t > lastPointTime)
-                        lastPointTime = t;
-                }    
+                    t = ((ContinuousEvent)ev).IntensityCurve.Last().Time;
+
+                if (t > lastPointTime)
+                    lastPointTime = t;
             }
             return lastPointTime;
         }
@@ -766,7 +764,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 patternList.AddRange(ev.ToPatterns());
             patternList.Sort();
             AHAPFile file = new();
-            file.Metadata = new Metadata();
+            file.Metadata = new Metadata(projectName);
             file.Pattern = patternList;
             file.Version = 1;
             return file;
@@ -895,48 +893,41 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        public Texture2D PaintWaveformSpectrum(AudioClip audio, int width, int height, Color color, bool normalize)
+        public Texture2D PaintWaveform(AudioClip audio, int width, int height, Color color, bool normalize)
         {
-            Texture2D tex = new(width, height, TextureFormat.RGBA32, false);
+            // Calculate samples
             float[] samples = new float[audio.samples * audio.channels];
             float[] waveform = new float[width];
             audio.GetData(samples, 0);
             int packSize = (samples.Length / width) + 1;
-            int s = 0;
             float maxValue = 0;
-            for (int i = 0; i < samples.Length; i += packSize)
+            for (int i = 0, s = 0; i < samples.Length; i += packSize, s++)
             {
                 waveform[s] = Mathf.Abs(samples[i]);
                 maxValue = Mathf.Max(maxValue, waveform[s]);
-                s++;
             }
             if (normalize)
             {
-                for (int x = 0; x < waveform.Length; x++)
-                {
+                for (int x = 0; x < width; x++)
                     waveform[x] /= maxValue;
-                }
             }
 
+            // Paint waveform
+            Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
             for (int x = 0; x < width; x++)
-            {
                 for (int y = 0; y < height; y++)
-                {
-                    tex.SetPixel(x, y, Color.clear);
-                }
-            }
-
-            for (int x = 0; x < waveform.Length; x++)
+                    texture.SetPixel(x, y, Color.clear);
+            for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y <= waveform[x] * (height * 0.75f); y++)
                 {
-                    tex.SetPixel(x, (height / 2) + y, color);
-                    tex.SetPixel(x, (height / 2) - y, color);
+                    texture.SetPixel(x, (height / 2) + y, color);
+                    texture.SetPixel(x, (height / 2) - y, color);
                 }
             }
-            tex.Apply();
+            texture.Apply();
 
-            return tex;
+            return texture;
         }
     }    
 }

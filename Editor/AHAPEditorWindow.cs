@@ -198,7 +198,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Color transientEventColor = new(0.22f, 0.6f, 1f);
         Color continuousEventColor = new(1f, 0.6f, 0.2f);
         Color continuousEventCreateColor = new(1f, 0.6f, 0.2f, 0.5f);
-        Color hoverPointColor = new(0.8f, 0.8f, 0.8f, 0.2f);;
+        Color hoverPointColor = new(0.8f, 0.8f, 0.8f, 0.2f);
         Color differentPlotHelpLineColor = new(1f, 0.6f, 0.2f);
 
         // Data

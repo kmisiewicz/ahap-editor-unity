@@ -226,6 +226,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
         float dragMin, dragMax;
+        string projectName;
 
         bool referenceClipVisible = false;
         float lastAudioClipPaintedZoom = 1f;
@@ -275,6 +276,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             #region Top UI
                         
             GUILayout.BeginHorizontal();
+            projectName = EditorGUILayout.TextField(new GUIContent("Project Name", "Name that will be save in project's metadata."), projectName);
             ahapFile = EditorGUILayout.ObjectField("AHAP File", ahapFile, typeof(TextAsset), false) as TextAsset;
             if (ahapFile == null) 
                 GUI.enabled = false;
@@ -884,6 +886,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         }
                     }
                     time = GetLastPointTime();
+                    projectName = ahap.Metadata.Project;
                 }
                 catch (Exception ex)
                 {

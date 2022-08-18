@@ -546,6 +546,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 Repaint();
         }
 
+        #region Helper functions
+
         private ContinuousEvent GetContinuousEventIfBetween(float time)
         {
             foreach (var ev in events)
@@ -576,14 +578,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private float GetLastPointTime()
         {
-            float lastPointTime = 0;
-            float t;
+            float lastPointTime = 0, t;
             foreach (var ev in events)
             {
-                if (ev is TransientEvent)
-                    t = ev.Time;
-                else
-                    t = ((ContinuousEvent)ev).IntensityCurve.Last().Time;
+                t = ev is TransientEvent ? ev.Time : ((ContinuousEvent)ev).IntensityCurve.Last().Time;
 
                 if (t > lastPointTime)
                     lastPointTime = t;
@@ -618,15 +616,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 NullValueHandling = NullValueHandling.Ignore
             });
 
-            if (this.ahapFile != null)
-            {
-                if (EditorUtility.DisplayDialog("Overwrite file?", "Do you want to overwrite selected file?",
-                    "Yes, overwrite", "No, create new"))
-                {
-                    File.WriteAllText(Path.Combine(Environment.CurrentDirectory, AssetDatabase.GetAssetPath(this.ahapFile)), json);
-                    EditorUtility.SetDirty(this.ahapFile);
-                    return;
-                }
+            if (this.ahapFile != null && EditorUtility.DisplayDialog("Overwrite file?", "Do you want to overwrite selected file?",
+                "Yes, overwrite", "No, create new"))
+            {                
+                File.WriteAllText(Path.Combine(Environment.CurrentDirectory, AssetDatabase.GetAssetPath(this.ahapFile)), json);
+                EditorUtility.SetDirty(this.ahapFile);
+                return;
             }
 
             var path = EditorUtility.SaveFilePanelInProject("Save AHAP JSON", "ahap", "json", "Enter file name");
@@ -643,9 +638,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             if (ahapFile != null)
             {
+                AHAPFile ahap;
                 try
                 {
-                    AHAPFile ahap = JsonConvert.DeserializeObject<AHAPFile>(ahapFile.text);
+                    ahap = JsonConvert.DeserializeObject<AHAPFile>(ahapFile.text);
 
                     if (events != null) events.Clear();
                     else events = new List<VibrationEvent>();
@@ -667,8 +663,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             {
                                 float t = (float)e.Time;
                                 List<EventPoint> intensityPoints = new();
-                                Pattern curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t && 
-                                    element.ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY);
+                                Pattern curve = FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
@@ -676,8 +671,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                         intensityPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
                                         t = (float)point.Time;
                                     }
-                                    curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
-                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY && element != curve);
+                                    curve = FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
                                 }
                                 if (intensityPoints.Count == 0)
                                 {
@@ -689,8 +683,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                                 t = (float)e.Time;
                                 List<EventPoint> sharpnessPoints = new();
-                                curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
-                                    element.ParameterCurve.ParameterID == AHAPFile.CURVE_SHARPNESS);
+                                curve = FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
@@ -698,8 +691,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                         sharpnessPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
                                         t = (float)point.Time;
                                     }
-                                    curve = ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == t &&
-                                        element.ParameterCurve.ParameterID == AHAPFile.CURVE_SHARPNESS && element != curve);
+                                    curve = FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
                                 }
                                 if (sharpnessPoints.Count == 0)
                                 {
@@ -723,7 +715,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 catch (Exception ex)
                 {
                     Debug.LogError($"Error while importing file {ahapFile.name}{Environment.NewLine}{ex.Message}");
-                }                
+                }
+
+                Pattern FindCurveOnTime(string curveType, float time, Pattern previousCurve = null)
+                {
+                    return ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == time &&
+                        element.ParameterCurve.ParameterID == curveType && element != previousCurve);
+                }
             }
         }
 
@@ -748,9 +746,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             // Paint waveform
             Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
-            for (int x = 0; x < width; x++)
-                for (int y = 0; y < height; y++)
-                    texture.SetPixel(x, y, Color.clear);
+            texture.SetPixels(Enumerable.Repeat(Color.clear, width * height).ToArray());
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y <= waveform[x] * (height * 0.75f); y++)
@@ -763,5 +759,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             return texture;
         }
-    }    
+
+        #endregion
+    }
 }

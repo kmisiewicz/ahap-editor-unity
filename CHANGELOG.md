@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2022-08-21
+### Added
+- Waveform scale parameter
+- Project name field
+
+### Changed
+- Organized code
+  - Moved plot event help classes to separate file
+  - Added global parameters on top of the file for easier settings adjustments
+
 ## [0.2.1] - 2022-07-23
 ### Fixed
 - Importing file with a single point curve where point overlaps with last point of previous curve won't result in infinite loop/memory leak

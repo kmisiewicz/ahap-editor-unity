@@ -220,7 +220,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             Rect scrollArea = new(plotArea.position + plotOffset, plotArea.size - plotOffset);
             GUIStyle xAxisLabelStyle = new(GUI.skin.label);
-            xAxisLabelStyle.alignment = TextAnchor.UpperCenter;
+            xAxisLabelStyle.alignment = TextAnchor.UpperLeft;
+            int labelLeftMargin = xAxisLabelStyle.margin.left;
+            xAxisLabelStyle.margin.left = 0;
 
             #endregion
 
@@ -250,14 +252,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             Vector2 xAxisLabelMiddleOffset = new (20, 0);
-            GUI.Label(intensityXAxisLabelRect, "0");
+            GUI.Label(intensityXAxisLabelRect, "0", xAxisLabelStyle);
             intensityXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
             Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, 0),
                     new Vector3(xAxisLabelOffset.x / 2, intensityPlotRect.height));
-            GUI.Label(sharpnessXAxisLabelRect, "0");
+            GUI.Label(sharpnessXAxisLabelRect, "0" ,xAxisLabelStyle);
             sharpnessXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
             Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset),
                     new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
+            xAxisLabelStyle.alignment = TextAnchor.UpperCenter;
+            xAxisLabelStyle.margin.left = labelLeftMargin;
             for (int i = 1; i < xAxisLabelCount; i++)
             {
                 string label = (i * time / xAxisLabelCount).ToString("#0.###");
@@ -279,6 +283,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             intensityXAxisLabelRect.position -= xAxisLabelMiddleOffset;
             sharpnessXAxisLabelRect.position -= xAxisLabelMiddleOffset;
             xAxisLabelStyle.alignment = TextAnchor.UpperRight;
+            xAxisLabelStyle.margin.right = 0;
             GUI.Label(intensityXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
             GUI.Label(sharpnessXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
                         

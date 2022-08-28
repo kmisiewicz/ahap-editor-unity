@@ -1,6 +1,6 @@
 {
 	"name": "com.chroma.ahapeditor",
-	"version": "0.1.0",
+	"version": "0.3.0",
 	"displayName": "AHAP Editor for Unity",
 	"description": "This package contains an editor window script allowing to edit advanced haptic patterns.",
 	"unity": "2021.3",
@@ -16,5 +16,12 @@
 	"author": {
 		"name": "Krzysztof Misiewicz",
 		"email": "k.misiewicz97@gmail.com"
-	}
+	},
+	"samples": [
+		{
+			"displayName": "Nice Vibrations Rumble Tester",
+			"description": "For owners of Nice Vibrations 3.9. Contains a script to test advanced haptic patterns converted to rumble waveforms in editor with a gamepad. Requires Input System package.",
+			"path": "Samples~/NiceVibrationsRumbleTester"
+		}
+	]
 }

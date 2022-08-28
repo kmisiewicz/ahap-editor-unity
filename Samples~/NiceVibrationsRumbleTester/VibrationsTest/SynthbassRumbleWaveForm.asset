@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 293e87131443fc542ba7cdc54a7314f4, type: 3}
+  m_Name: SynthbassRumbleWaveForm
+  m_EditorClassIdentifier: 
+  WaveForm:
+    Pattern: 6d0100000000000092010000000000002c00000000000000d90100000000000037000000000000007101000000000000befaffffffffffff92010000000000002c00000000000000d90100000000000037000000000000007101000000000000
+    LowFrequencyAmplitudes: f400000033000000e70000001c000000c000000000000000
+    HighFrequencyAmplitudes: e500000019000000e70000002b0000009400000004000000
+  AHAPFile: {fileID: 4900000, guid: 5ebd510621bce774b9c9ec1f3b901c1c, type: 3}
+  IntensityMultiplier: 1
+  SharpnessMultiplier: 1

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 293e87131443fc542ba7cdc54a7314f4, type: 3}
+  m_Name: KotsuzumiRollRumbleWaveForm
+  m_EditorClassIdentifier: 
+  WaveForm:
+    Pattern: b503000000000000cb01000000000000e602000000000000af030000000000009ff7ffffffffffffec01000000000000c203000000000000b302000000000000
+    LowFrequencyAmplitudes: ed000000920000007a00000000000000
+    HighFrequencyAmplitudes: e5000000900000005b00000000000000
+  AHAPFile: {fileID: 4900000, guid: a04801e9e1047ec41b3efc9809b98983, type: 3}
+  IntensityMultiplier: 1
+  SharpnessMultiplier: 1

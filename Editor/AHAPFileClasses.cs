@@ -15,11 +15,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Time = time;
             EventType = type;
             EventDuration = duration;
-            EventParameters = new List<EventParameter>()
-                {
+            EventParameters = new List<EventParameter>() {
                     new EventParameter(AHAPFile.PARAM_INTENSITY, intensity),
-                    new EventParameter(AHAPFile.PARAM_SHARPNESS, sharpness)
-                };
+                    new EventParameter(AHAPFile.PARAM_SHARPNESS, sharpness)};
         }
     }
 

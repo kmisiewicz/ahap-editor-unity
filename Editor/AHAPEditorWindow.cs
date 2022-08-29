@@ -147,7 +147,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.EndHorizontal();
 
             Rect refRect = EditorGUILayout.GetControlRect();
-            Rect editModeRect = EditorGUI.PrefixLabel(refRect, new GUIContent("Edit Mode"));
+            Rect editModeRect = EditorGUI.PrefixLabel(refRect, new GUIContent("Point Drag Mode"));
             var pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)
                 pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
@@ -473,48 +473,45 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     draggedPoint = hoverPoint;
                     draggedPointEvent = hoverPointEvent;
-                    if (pointDragMode == PointDragMode.LockTime)
+                    
+                    dragMin = scrollPosition.x / plotSize.x * time + NEIGHBOURING_POINT_OFFSET;
+                    dragMax = (scrollPosition.x + visiblePlotWidth) / plotSize.x * time - NEIGHBOURING_POINT_OFFSET;
+                    if (hoverPointEvent is ContinuousEvent continuousEvent)
                     {
-                        dragMin = dragMax = draggedPoint.Time;
-                    }
-                    else
-                    {
-                        dragMin = scrollPosition.x / plotSize.x * time + NEIGHBOURING_POINT_OFFSET;
-                        dragMax = (scrollPosition.x + visiblePlotWidth) / plotSize.x * time - NEIGHBOURING_POINT_OFFSET;
-                        if (hoverPointEvent is ContinuousEvent continuousEvent)
+                        ContinuousEvent ce = GetContinuousEventIfBetween(hoverPoint.Time);
+                        if (ce != null)
                         {
-                            ContinuousEvent ce = GetContinuousEventIfBetween(hoverPoint.Time);
-                            if (ce != null)
-                            {
-                                var curve = mouseLocation == MouseLocation.IntensityPlot ? continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
-                                dragMin = curve.FindLast(point => point.Time < hoverPoint.Time).Time + NEIGHBOURING_POINT_OFFSET;
-                                dragMax = curve.Find(point => point.Time > hoverPoint.Time).Time - NEIGHBOURING_POINT_OFFSET;
-                            }
-                            else if (draggedPoint == continuousEvent.IntensityCurve.First() || draggedPoint == continuousEvent.SharpnessCurve.First())
-                            {
-                                dragMax = Mathf.Min(continuousEvent.IntensityCurve[1].Time, continuousEvent.SharpnessCurve[1].Time) - NEIGHBOURING_POINT_OFFSET;
-                                var previousEvent = events.FindLast(ev => ev.Time < hoverPoint.Time && ev is ContinuousEvent);
-                                if (previousEvent != null)
-                                    dragMin = ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + NEIGHBOURING_POINT_OFFSET;
-                            }
-                            else if (draggedPoint == continuousEvent.IntensityCurve.Last() || draggedPoint == continuousEvent.SharpnessCurve.Last())
-                            {
-                                dragMin = Mathf.Max(continuousEvent.IntensityCurve[continuousEvent.IntensityCurve.Count - 2].Time,
-                                    continuousEvent.SharpnessCurve[continuousEvent.SharpnessCurve.Count - 2].Time) + NEIGHBOURING_POINT_OFFSET;
-                                var nextEvent = events.Find(ev => ev.Time > hoverPoint.Time && ev is ContinuousEvent);
-                                if (nextEvent != null)
-                                    dragMax = ((ContinuousEvent)nextEvent).IntensityCurve.First().Time - NEIGHBOURING_POINT_OFFSET;
-                            }
+                            var curve = mouseLocation == MouseLocation.IntensityPlot ? continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
+                            dragMin = curve.FindLast(point => point.Time < hoverPoint.Time).Time + NEIGHBOURING_POINT_OFFSET;
+                            dragMax = curve.Find(point => point.Time > hoverPoint.Time).Time - NEIGHBOURING_POINT_OFFSET;
+                        }
+                        else if (draggedPoint == continuousEvent.IntensityCurve.First() || draggedPoint == continuousEvent.SharpnessCurve.First())
+                        {
+                            dragMax = Mathf.Min(continuousEvent.IntensityCurve[1].Time, continuousEvent.SharpnessCurve[1].Time) - NEIGHBOURING_POINT_OFFSET;
+                            var previousEvent = events.FindLast(ev => ev.Time < hoverPoint.Time && ev is ContinuousEvent);
+                            if (previousEvent != null)
+                                dragMin = ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + NEIGHBOURING_POINT_OFFSET;
+                        }
+                        else if (draggedPoint == continuousEvent.IntensityCurve.Last() || draggedPoint == continuousEvent.SharpnessCurve.Last())
+                        {
+                            dragMin = Mathf.Max(continuousEvent.IntensityCurve[continuousEvent.IntensityCurve.Count - 2].Time,
+                                continuousEvent.SharpnessCurve[continuousEvent.SharpnessCurve.Count - 2].Time) + NEIGHBOURING_POINT_OFFSET;
+                            var nextEvent = events.Find(ev => ev.Time > hoverPoint.Time && ev is ContinuousEvent);
+                            if (nextEvent != null)
+                                dragMax = ((ContinuousEvent)nextEvent).IntensityCurve.First().Time - NEIGHBOURING_POINT_OFFSET;
                         }
                     }
+
                     mouseClickLocation = mouseLocation;
                 }
                 else if (draggedPoint != null)
                 {
                     if (currentEvent.type == EventType.MouseDrag && mouseLocation == mouseClickLocation)
                     {
-                        draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
-                        draggedPoint.Value = pointDragMode != PointDragMode.LockValue ? Mathf.Clamp(plotPosition.y, 0, 1) : draggedPoint.Value;
+                        if (pointDragMode != PointDragMode.LockTime && !currentEvent.shift)
+                            draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
+                        if (pointDragMode != PointDragMode.LockValue && !currentEvent.alt)
+                            draggedPoint.Value = Mathf.Clamp(plotPosition.y, 0, 1);
                         if (draggedPointEvent is TransientEvent te)
                         {
                             te.Time = te.Intensity.Time = te.Sharpness.Time = draggedPoint.Time;

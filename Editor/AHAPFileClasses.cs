@@ -118,5 +118,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public int Version { get; set; }
         public Metadata Metadata { get; set; }
         public List<Pattern> Pattern { get; set; }
+
+        public AHAPFile(int version, Metadata metadata, List<Pattern> pattern)
+        {
+            Version = version;
+            Metadata = metadata;
+            Pattern = pattern;
+        }
     }
 }

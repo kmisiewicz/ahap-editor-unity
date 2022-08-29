@@ -4,8 +4,6 @@ using UnityEngine;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    internal enum MouseState { Unclicked = 0, MouseDown = 1, MouseDrag = 2 }
-
     internal enum MouseLocation { Outside = 0, IntensityPlot = 1, SharpnessPlot = 2 }
 
     internal class EventPoint

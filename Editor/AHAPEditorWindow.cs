@@ -26,6 +26,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         // Const settings
         const float MIN_TIME = 0.1f;
+        const float MAX_TIME = 30f;
         const float HOVER_OFFSET = 5f;
         const float ZOOM_INCREMENT = 0.1f;
         const float MAX_ZOOM = 7f;
@@ -36,27 +37,29 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float PLOT_EVENT_LINE_WIDTH = 4f;
         const float PLOT_BORDER_WIDTH = 5f;
         const float NEIGHBOURING_POINT_OFFSET = 0.001f;
-        const float MIN_WAVE_RENDER_SCALE = 0.1f;
-        const float MAX_WAVE_RENDER_SCALE = 2f;
+        const float MIN_WAVEFORM_RENDER_SCALE = 0.1f;
+        const float MAX_WAVEFORM_RENDER_SCALE = 2f;
 
-        Vector3 pointsNormal = new(0, 0, 1);
+        static readonly Vector3 POINTS_NORMAL = new(0, 0, 1);
 
         // Colors
-        Color plotBordersColor = Color.white;
-        Color plotHelpLinesColor = Color.gray;
-        Color waveformColor = new(0.42f, 1f, 0f, 0.2f);
-        Color waveformBackgroundColor = Color.clear;
-        Color transientEventColor = new(0.22f, 0.6f, 1f);
-        Color continuousEventColor = new(1f, 0.6f, 0.2f);
-        Color continuousEventCreateColor = new(1f, 0.6f, 0.2f, 0.5f);
-        Color hoverPointColor = new(0.8f, 0.8f, 0.8f, 0.2f);
-        Color differentPlotHelpLineColor = new(0.7f, 0f, 0f);
+        static readonly Color COLOR_PLOT_BORDER = Color.white;
+        static readonly Color COLOR_PLOT_GRID = Color.gray;
+        static readonly Color COLOR_WAVEFORM = new(0.42f, 1f, 0f, 0.2f);
+        static readonly Color COLOR_WAVEFORM_BG = Color.clear;
+        static readonly Color COLOR_EVENT_TRANSIENT = new(0.22f, 0.6f, 1f);
+        static readonly Color COLOR_EVENT_CONTINUOUS = new(1f, 0.6f, 0.2f);
+        static readonly Color COLOR_EVENT_CONTINUOUS_CREATION = new(1f, 0.6f, 0.2f, 0.5f);
+        static readonly Color COLOR_HOVER_POINT = new(0.8f, 0.8f, 0.8f, 0.2f);
+        static readonly Color COLOR_HOVER_GUIDES = new(0.7f, 0f, 0f);
 
         // Data
         TextAsset ahapFile;
         AudioClip audioClip;
 		float zoom = 1f;
         float time = 1f;        
+        string projectName;
+
         List<VibrationEvent> events = new();
         Vector2 scrollPosition = Vector2.zero;
         Vector2 plotSize = Vector2.one;
@@ -74,7 +77,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
         float dragMin, dragMax;
-        string projectName;
         
         // Audio waveform
         bool referenceClipVisible = false;
@@ -89,9 +91,18 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static void OpenWindow()
         {
             AHAPEditorWindow window = GetWindow<AHAPEditorWindow>("AHAP Editor");
-            var c = EditorGUIUtility.IconContent("d_HoloLensInputModule Icon", "AHAP Editor");
-            c.text = "AHAP Editor";
-            window.titleContent = c;
+            var content = EditorGUIUtility.IconContent("d_HoloLensInputModule Icon", "AHAP Editor");
+            content.text = "AHAP Editor";
+            window.titleContent = content;
+            window.Clear();
+        }
+
+        private void Clear()
+        {
+            if (events != null) events.Clear();
+            else events = new List<VibrationEvent>();
+            time = 1f;
+            zoom = 1f;
         }
 
         private void OnGUI()
@@ -101,7 +112,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float lineWithSpacing = lineHeight + lineSpacing;
             float lineHalfHeight = lineHeight / 2f;
 
-            #region Zoom and scrolling handling (mouse wheel)
+            #region Zoom and scroll handling (mouse wheel)
 
             var currentEvent = UnityEngine.Event.current;
             if (currentEvent.type == EventType.ScrollWheel)
@@ -122,59 +133,85 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             #endregion
 
             #region Top UI
-                        
+
+            float topBarHeight = 3 * lineWithSpacing + lineSpacing;
+            Rect topBarRect = new(new Vector2(3, 2), new Vector2(position.width - 6, topBarHeight));
+            //EditorGUI.DrawRect(topBarRect, Color.blue); //debug
+            GUILayout.BeginArea(topBarRect);
             GUILayout.BeginHorizontal();
-            projectName = EditorGUILayout.TextField(new GUIContent("Project Name", "Name that will be save in project's metadata."), projectName);
-            ahapFile = EditorGUILayout.ObjectField("AHAP File", ahapFile, typeof(TextAsset), false) as TextAsset;
-            if (ahapFile == null) 
-                GUI.enabled = false;
-            if (GUILayout.Button("Import", GUILayout.Width(70)))
+
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            EditorGUILayout.LabelField("File", EditorStyles.boldLabel);
+            ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false) as TextAsset;
+            GUILayout.BeginHorizontal();
+            GUI.enabled = ahapFile != null;
+            if (GUILayout.Button("Import"))
                 HandleImport();
             GUI.enabled = true;
-            GUILayout.Space(50);
-            audioClip = EditorGUILayout.ObjectField("Reference audio clip", audioClip, typeof(AudioClip), false) as AudioClip;
-            if (audioClip == null)
-                GUI.enabled = false;
-            referenceClipVisible = EditorGUILayout.Toggle("Waveform visible", referenceClipVisible);
-            if (!referenceClipVisible) lastAudioClipPaintedZoom = 0;
-            normalize = EditorGUILayout.Toggle("Normalize waveform", normalize);
-            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(new GUIContent("Waveform render scale"), renderScale), MIN_WAVE_RENDER_SCALE, MAX_WAVE_RENDER_SCALE);
-            GUI.enabled = true;
-            GUILayout.Space(50);
-            time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField("Time", time), GetLastPointTime()), MIN_TIME);
-            if (audioClip != null)
-                time = Mathf.Max(time, audioClip.length);
+            if (GUILayout.Button("Save"))
+                HandleSaving();
             GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
 
-            Rect refRect = EditorGUILayout.GetControlRect();
-            Rect editModeRect = EditorGUI.PrefixLabel(refRect, new GUIContent("Point Drag Mode"));
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            EditorGUILayout.LabelField("Reference waveform", EditorStyles.boldLabel);
+            GUILayout.BeginHorizontal();
+            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false) as AudioClip;
+            GUI.enabled = audioClip != null;
+            referenceClipVisible = EditorGUILayout.Toggle(GUIContent.none, referenceClipVisible, GUILayout.MaxWidth(15));
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (!referenceClipVisible) lastAudioClipPaintedZoom = 0;
+            var renderScaleLabel = new GUIContent("Render scale");
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(renderScaleLabel).x + 3;
+            normalize = EditorGUILayout.Toggle("Normalize", normalize);
+            GUILayout.FlexibleSpace();
+            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(renderScaleLabel, renderScale),
+                MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
+            EditorGUIUtility.labelWidth = 0;
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            EditorGUILayout.LabelField("Plot", EditorStyles.boldLabel);
+            GUILayout.BeginHorizontal();
+            var projectNameLabel = new GUIContent("Project", "Name that will be save in project's metadata.");
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(projectNameLabel).x + 3;
+            projectName = EditorGUILayout.TextField(projectNameLabel, projectName, GUILayout.ExpandWidth(false));
+            GUILayout.FlexibleSpace();
+            time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField("Time", time, GUILayout.ExpandWidth(false)), GetLastPointTime()), MIN_TIME);
+            EditorGUIUtility.labelWidth = 0;
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Clear"))
+                Clear();
+            if (GUILayout.Button("Reset zoom"))
+                zoom = 1;
+            GUILayout.EndHorizontal();
+            GUILayout.EndVertical();
+
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
             var pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)
                 pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
-            pointDragMode = (PointDragMode)GUI.SelectionGrid(editModeRect, (int)pointDragMode, pointDragModes, pointDragModes.Length);
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save"))
-                HandleSaving();
-            if (GUILayout.Button("Clear"))
-            {
-                if (events != null) events.Clear();
-                else events = new List<VibrationEvent>();
-                time = 1;
-            }
-            if (GUILayout.Button("Reset zoom"))
-                zoom = 1;
+            pointDragMode = (PointDragMode)GUILayout.SelectionGrid((int)pointDragMode, pointDragModes, pointDragModes.Length);
             snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
+            GUILayout.EndVertical();
+
             GUILayout.EndHorizontal();
+            GUILayout.EndArea();            
 
             #endregion
 
             #region Plot area
 
+            Rect refRect = EditorGUILayout.GetControlRect();
             Rect bottomLine = new(new Vector2(refRect.x, position.height - lineWithSpacing), refRect.size);
             int toplinesTaken = 3;
-            int bottomLinesTaken = 1;         	
-			float topOffset = toplinesTaken * lineWithSpacing + lineSpacing;			
+            int bottomLinesTaken = 1;
+			float topOffset = toplinesTaken * lineWithSpacing + 2 * lineSpacing;
 			float bottomOffset = bottomLinesTaken * lineWithSpacing + lineSpacing;
             Rect plotArea = position;
             plotArea.position = new Vector2(refRect.x, topOffset);
@@ -212,7 +249,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Vector2 yAxisLabelOffset = new(0, intensityPlotRect.height / (yAxisLabelCount - 1));
             GUIStyle yAxisLabelStyle = new(GUI.skin.label);
             yAxisLabelStyle.alignment = TextAnchor.MiddleRight;
-            Handles.color = plotHelpLinesColor;
+            Handles.color = COLOR_PLOT_GRID;
             for (int i = 0; i < yAxisLabelCount; i++)
             {
                 string label = (1 - i * verticalAxisLabelInterval).ToString("0.##");
@@ -250,7 +287,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || audioClip.name != lastAudioClipName || normalize != wasNormalized)
                 {
-                    audioClipTexture = PaintAudioWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), waveformBackgroundColor, waveformColor, normalize);
+                    audioClipTexture = PaintAudioWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), COLOR_WAVEFORM_BG, COLOR_WAVEFORM, normalize);
                     lastAudioClipPaintedZoom = zoom;
                     lastAudioClipName = audioClip.name;
                     wasNormalized = normalize;
@@ -294,7 +331,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUI.Label(intensityXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
             GUI.Label(sharpnessXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
                         
-            Handles.color = plotBordersColor;
+            Handles.color = COLOR_PLOT_BORDER;
             Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH, new Vector3(1, 1), new Vector3(plotSize.x - 1, 1), 
                 new Vector3(plotSize.x - 1, intensityPlotRect.height - 1), new Vector3(1, intensityPlotRect.height - 1), new Vector3(1, 1));
             Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH, new Vector3(1, sharpnessPlotHeightOffset + 1), new Vector3(plotSize.x - 1, sharpnessPlotHeightOffset + 1),
@@ -305,19 +342,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (vibraEvent is TransientEvent transientEvent)
                 {
-                    Handles.color = transientEventColor;
+                    Handles.color = COLOR_EVENT_TRANSIENT;
 
                     Vector3 intensityPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Intensity.Value, MouseLocation.IntensityPlot);
-                    Handles.DrawSolidDisc(intensityPoint, pointsNormal, PLOT_EVENT_POINT_SIZE);
+                    Handles.DrawSolidDisc(intensityPoint, POINTS_NORMAL, PLOT_EVENT_POINT_SIZE);
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, intensityPlotRect.height));
 
                     Vector3 sharpnessPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Sharpness.Value, MouseLocation.SharpnessPlot);
-                    Handles.DrawSolidDisc(sharpnessPoint, pointsNormal, PLOT_EVENT_POINT_SIZE);
+                    Handles.DrawSolidDisc(sharpnessPoint, POINTS_NORMAL, PLOT_EVENT_POINT_SIZE);
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
                 }
                 else if (vibraEvent is ContinuousEvent continuousEvent)
                 {
-                    Handles.color = continuousEventColor;
+                    Handles.color = COLOR_EVENT_CONTINUOUS;
 
                     List<Vector3> points = new();
                     points.Add(PointToPlotCoords(continuousEvent.IntensityCurve[0].Time, 0, MouseLocation.IntensityPlot));
@@ -325,7 +362,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     {
                         EventPoint point = continuousEvent.IntensityCurve[i];
                         points.Add(PointToPlotCoords(point.Time, point.Value, MouseLocation.IntensityPlot));
-                        Handles.DrawSolidDisc(points.Last(), pointsNormal, PLOT_EVENT_POINT_SIZE);
+                        Handles.DrawSolidDisc(points.Last(), POINTS_NORMAL, PLOT_EVENT_POINT_SIZE);
                     }
                     points.Add(PointToPlotCoords(continuousEvent.IntensityCurve.Last().Time, 0, MouseLocation.IntensityPlot));
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
@@ -336,7 +373,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     {
                         EventPoint point = continuousEvent.SharpnessCurve[i];
                         points.Add(PointToPlotCoords(point.Time, point.Value, MouseLocation.SharpnessPlot));
-                        Handles.DrawSolidDisc(points.Last(), pointsNormal, PLOT_EVENT_POINT_SIZE);
+                        Handles.DrawSolidDisc(points.Last(), POINTS_NORMAL, PLOT_EVENT_POINT_SIZE);
                     }
                     points.Add(PointToPlotCoords(continuousEvent.SharpnessCurve.Last().Time, 0, MouseLocation.SharpnessPlot));
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
@@ -349,7 +386,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #region Mouse location
 
-            Handles.color = differentPlotHelpLineColor;
+            Handles.color = COLOR_HOVER_GUIDES;
             Vector2 mousePosition = currentEvent.mousePosition;
             Vector2 plotPosition = Vector2.negativeInfinity;
             Vector2 plotRectMousePosition = Vector2.negativeInfinity;
@@ -375,7 +412,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             if (mouseLocation != MouseLocation.Outside)
             {
-                Handles.DrawSolidDisc(new Vector3(mousePosition.x, mousePosition.y, 0), pointsNormal, HOVER_DOT_SIZE);
+                Handles.DrawSolidDisc(new Vector3(mousePosition.x, mousePosition.y, 0), POINTS_NORMAL, HOVER_DOT_SIZE);
                 float x = (scrollPosition.x + plotRectMousePosition.x) / plotSize.x * time;
                 float y = (intensityPlotRect.height - plotRectMousePosition.y) / intensityPlotRect.height;
                 realPlotPosition = new Vector2(x, y);
@@ -402,8 +439,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         windowSpaceHoverPoint = new(sharpnessPlotRect.x + hoverPoint.Time / time * plotSize.x - scrollPosition.x,
                             sharpnessPlotRect.y + sharpnessPlotRect.height - hoverPoint.Value * sharpnessPlotRect.height, 0);
                     }
-                    Handles.color = hoverPointColor;
-                    Handles.DrawSolidDisc(windowSpaceHoverPoint, pointsNormal, HOVER_HIGHLIGHT_SIZE);
+                    Handles.color = COLOR_HOVER_POINT;
+                    Handles.DrawSolidDisc(windowSpaceHoverPoint, POINTS_NORMAL, HOVER_HIGHLIGHT_SIZE);
                 }
             }
 
@@ -466,7 +503,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     {
                         EditorGUI.DrawRect(new Rect(continuousEventWindowPos, mousePosition.y, mousePosition.x - continuousEventWindowPos,
                             mouseLocation == MouseLocation.IntensityPlot ? intensityPlotRect.y + intensityPlotRect.height - mousePosition.y :
-                            sharpnessPlotRect.y + sharpnessPlotRect.height - mousePosition.y), continuousEventCreateColor);
+                            sharpnessPlotRect.y + sharpnessPlotRect.height - mousePosition.y), COLOR_EVENT_CONTINUOUS_CREATION);
                     }
                 }
                 else if (draggedPoint == null && currentEvent.type == EventType.MouseDown)

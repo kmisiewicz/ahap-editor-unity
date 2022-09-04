@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Sample with a script to test vibrations on gamepad via Nice Vibrations
 - *Shift* locks time and *Alt* locks value of dragged point in addition to selected point drag mode in the top UI
+- Audio clip preview button
+
+### Changed
+- Redesigned top UI
 
 ### Fixed
 - Plot X axis first and labels are now in correct positions

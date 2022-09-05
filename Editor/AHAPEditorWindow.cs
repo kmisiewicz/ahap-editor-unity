@@ -118,10 +118,21 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float topBarHeight = lineWithSpacing * 3 + lineHalfHeight + lineSpacing * 2;
             Rect topBarRect = new(MARGIN, new Vector2(position.width - MARGIN.x * 2, topBarHeight));
             //EditorGUI.DrawRect(topBarRect, Color.blue); //debug
+            float topBarOptionsContainerWidth = 0.12f * Screen.currentResolution.width;
+            var topBarMaxWidthOption = GUILayout.MaxWidth(topBarOptionsContainerWidth);
 
-            float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineSpacing * 2;
-            Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineSpacing, topBarRect.width, bottomPartHeight);
+            float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineHalfHeight - lineSpacing;
+            Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineHalfHeight, topBarRect.width, bottomPartHeight);
             //EditorGUI.DrawRect(bottomPartRect, Color.black); //debug
+
+            float plotAreaWidth = bottomPartRect.width * 0.8f;
+            Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
+            //EditorGUI.DrawRect(plotAreaRect, Color.yellow); //debug
+
+            float pointEditAreaWidth = bottomPartRect.width - plotAreaWidth - lineSpacing * 2;
+            Rect pointEditAreaRect = new Rect(bottomPartRect.position + new Vector2(plotAreaRect.width + lineSpacing * 2, 0),
+                new Vector2(pointEditAreaWidth, bottomPartHeight));
+            //EditorGUI.DrawRect(pointEditAreaRect, Color.green); //debug
 
             #region Zoom and scroll handling (mouse wheel)
 
@@ -143,13 +154,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #endregion
 
-            #region Top UI
+            #region Top Bar
 
             GUILayout.BeginArea(topBarRect, EditorStyles.helpBox);
             GUILayout.BeginHorizontal();
 
             // File
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("File", EditorStyles.boldLabel);
             ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false) as TextAsset;
             GUILayout.BeginHorizontal();
@@ -163,19 +174,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.EndVertical();
 
             // Audio waveform
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("Reference waveform", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
             EditorGUI.BeginChangeCheck();
-            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false) as AudioClip;
+            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false, GUILayout.MinWidth(topBarOptionsContainerWidth * 0.25f)) as AudioClip;
             if (EditorGUI.EndChangeCheck())
             {
-                StopAllClips();
+                AudioClipUtils.StopAllClips();
                 audioWaveformVisible = false;
             }
             GUI.enabled = audioClip != null;
-            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton")))
-                PlayClip(audioClip);
+            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), GUILayout.MaxWidth(30)))
+                AudioClipUtils.PlayClip(audioClip);
             GUILayout.FlexibleSpace();
             var waveformVisibleLabel = new GUIContent("Visible");
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
@@ -184,10 +195,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginHorizontal();
             if (!audioWaveformVisible)
                 lastAudioClipPaintedZoom = 0;
+            var normalizeLabel = new GUIContent("Normalize");
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(normalizeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            normalize = EditorGUILayout.Toggle(normalizeLabel, normalize);
             var renderScaleLabel = new GUIContent("Render scale");
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            normalize = EditorGUILayout.Toggle("Normalize", normalize);
-            GUILayout.FlexibleSpace();
             renderScale = Mathf.Clamp(EditorGUILayout.FloatField(renderScaleLabel, renderScale),
                 MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
             GUI.enabled = true;
@@ -195,7 +207,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.EndVertical();
 
             // Plot
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("Plot", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
             var projectNameLabel = new GUIContent("Project", "Name that will be save in project's metadata.");
@@ -203,19 +215,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             projectName = EditorGUILayout.TextField(projectNameLabel, projectName);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Clear", GUILayout.MaxWidth(100)))
+            if (GUILayout.Button("Clear", GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f)))
                 Clear();
-            if (GUILayout.Button("Reset zoom", GUILayout.MaxWidth(100)))
+            if (GUILayout.Button("Reset zoom", GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f)))
                 zoom = 1;
             var timeLabel = new GUIContent("Time");
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField(timeLabel, time, GUILayout.ExpandWidth(false)), GetLastPointTime()), MIN_TIME);
+            time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField(timeLabel, time), GetLastPointTime()), MIN_TIME);
             EditorGUIUtility.labelWidth = 0;
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
 
             // Point editing
-            GUILayout.BeginVertical(GUI.skin.box, GUILayout.MaxWidth(300));
+            GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
             var pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)
@@ -311,7 +323,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || audioClip.name != lastAudioClipName || normalize != wasNormalized)
                 {
-                    audioClipTexture = PaintAudioWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), COLOR_WAVEFORM_BG, COLOR_WAVEFORM, normalize);
+                    audioClipTexture = AudioClipUtils.PaintAudioWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), COLOR_WAVEFORM_BG, COLOR_WAVEFORM, normalize);
                     lastAudioClipPaintedZoom = zoom;
                     lastAudioClipName = audioClip.name;
                     wasNormalized = normalize;
@@ -786,79 +798,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         element.ParameterCurve.ParameterID == curveType && element != previousCurve);
                 }
             }
-        }
-
-        public Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
-        {
-            // Calculate samples
-            float[] samples = new float[audio.samples * audio.channels];
-            float[] waveform = new float[width];
-            audio.GetData(samples, 0);
-            int packSize = (samples.Length / width) + 1;
-            float maxValue = 0;
-            for (int i = 0, s = 0; i < samples.Length; i += packSize, s++)
-            {
-                waveform[s] = Mathf.Abs(samples[i]);
-                maxValue = Mathf.Max(maxValue, waveform[s]);
-            }
-            if (normalize)
-                for (int x = 0; x < width; x++)
-                    waveform[x] /= maxValue;
-            
-            // Paint waveform
-            Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
-            texture.SetPixels(Enumerable.Repeat(Color.clear, width * height).ToArray());
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y <= waveform[x] * (height * 0.5f); y++)
-                {
-                    texture.SetPixel(x, (height / 2) + y, waveformColor);
-                    texture.SetPixel(x, (height / 2) - y, waveformColor);
-                }
-            }
-            texture.Apply();
-
-            return texture;
-        }
-
-        // Sound playing from editor
-        // https://forum.unity.com/threads/way-to-play-audio-in-editor-using-an-editor-script.132042/#post-7015753
-        public static void PlayClip(AudioClip clip, int startSample = 0, bool loop = false)
-        {
-            Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
-
-            Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
-            MethodInfo method = audioUtilClass.GetMethod(
-                "PlayPreviewClip",
-                BindingFlags.Static | BindingFlags.Public,
-                null,
-                new Type[] { typeof(AudioClip), typeof(int), typeof(bool) },
-                null
-            );
-
-            method.Invoke(
-                null,
-                new object[] { clip, startSample, loop }
-            );
-        }
-
-        public static void StopAllClips()
-        {
-            Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
-
-            Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
-            MethodInfo method = audioUtilClass.GetMethod(
-                "StopAllPreviewClips",
-                BindingFlags.Static | BindingFlags.Public,
-                null,
-                new Type[] { },
-                null
-            );
-
-            method.Invoke(
-                null,
-                new object[] { }
-            );
         }
 
         #endregion

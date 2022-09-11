@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    public class AudioClipUtils
+    internal class AudioClipUtils
     {
         public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
         {
@@ -56,10 +56,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 null
             );
 
-            method.Invoke(
-                null,
-                new object[] { clip, startSample, loop }
-            );
+            method.Invoke(null, new object[] { clip, startSample, loop });
         }
 
         public static void StopAllClips()
@@ -75,10 +72,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 null
             );
 
-            method.Invoke(
-                null,
-                new object[] { }
-            );
+            method.Invoke(null, new object[] { });
         }
     }
 }

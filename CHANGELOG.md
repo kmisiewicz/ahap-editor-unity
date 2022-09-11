@@ -11,10 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audio clip preview button
 
 ### Changed
-- Redesigned top UI
+- Redesigned GUI and reworked drawing code
 
 ### Fixed
 - Plot X axis first and labels are now in correct positions
+- Audio waveform is now drawn under horizontal grid lines
 
 ## [0.2.2] - 2022-08-21
 ### Added

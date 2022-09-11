@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -56,17 +57,30 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         static readonly Color COLOR_HOVER_POINT = new(0.8f, 0.8f, 0.8f, 0.2f);
         static readonly Color COLOR_HOVER_GUIDES = new(0.7f, 0f, 0f);
 
+        class Content
+        {
+            public static GUIContent waveformVisibleLabel = EditorGUIUtility.TrTextContent("Visible");
+            public static GUIContent normalizeLabel = EditorGUIUtility.TrTextContent("Normalize");
+            public static GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale");
+            public static GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project", "Name that will be save in project's metadata.");
+            public static GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
+
+            public static GUIStyle plotTitleStyle = new(EditorStyles.boldLabel) { alignment = TextAnchor.UpperCenter };
+            public static GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };
+            public static GUIStyle xAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
+            public static GUIContent yAxisLabelDummy = EditorGUIUtility.TrTextContent("#.##");
+            public static GUIContent xAxisLabelDummy = EditorGUIUtility.TrTextContent("##.###");
+
+        }
+
         // Data
         TextAsset ahapFile;
-        AudioClip audioClip;
 		float zoom = 1f;
         float time = 1f;        
-        string projectName;
-
+        string projectName = "";
         List<VibrationEvent> events = new();
-        Vector2 scrollPosition = Vector2.zero;
-        Vector2 plotSize = Vector2.one;
-        float visiblePlotWidth = 1f;
+        Vector2 scrollPositionOld = Vector2.zero;
+        Vector2 scrolledPlotSizeOld = Vector2.one;
         PointDragMode pointDragMode = PointDragMode.FreeMove;
         SnapMode snapMode = SnapMode.None;
         MouseState mouseState = MouseState.Unclicked;
@@ -74,21 +88,31 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         MouseLocation mouseClickLocation = MouseLocation.Outside;        
         Vector2 mouseClickPlotPosition;
         float continuousEventWindowPos;
-        float sharpnessPlotHeightOffset;
+        float sharpnessPlotHeightOffsetOld;
         EventPoint hoverPoint = null;
         VibrationEvent hoverPointEvent = null;
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
         float dragMin, dragMax;
-        
+                
         // Audio waveform
+        AudioClip audioClip;
         bool audioWaveformVisible = false;
         float lastAudioClipPaintedZoom = 1f;
         Texture2D audioClipTexture;
-        string lastAudioClipName = "None";
-        bool normalize, wasNormalized;
+        bool normalizeWaveform;
         float renderScale = 1f;
+        bool shouldRepaintWaveform = false;
 
+        // Help data NEW        
+        Vector2 plotScreenSize; // Size of single plot rect on screen
+        Vector2 plotScrollSize; // Size of scroll view
+        Vector2 scrollPosition;
+        float plotHeightOffset; // Difference between plots top left corner
+        string[] pointDragModes;
+
+        // Debug
+        bool drawRects;
 
         [MenuItem("Window/AHAP Editor")]
         public static void OpenWindow()
@@ -97,42 +121,113 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var content = EditorGUIUtility.IconContent("d_HoloLensInputModule Icon", "AHAP Editor");
             content.text = "AHAP Editor";
             window.titleContent = content;
-            window.Clear();
+        }
+
+        private void OnEnable()
+        {
+            Clear();
+            ahapFile = null;
+            projectName = "";
+            audioClip = null;
+            renderScale = 1f;
+            audioWaveformVisible = normalizeWaveform = shouldRepaintWaveform = false;
+            pointDragModes = Enum.GetNames(typeof(PointDragMode));
+            for (int i = 0; i < pointDragModes.Length; i++)
+                pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
         }
 
         private void Clear()
         {
-            if (events != null) events.Clear();
-            else events = new List<VibrationEvent>();
-            time = 1f;
-            zoom = 1f;
+            events ??= new List<VibrationEvent>();
+            events.Clear();
+            time = zoom = 1f;
         }
 
         private void OnGUI()
 		{
+            #region Size and positions calculations
+
             float lineHeight = EditorGUIUtility.singleLineHeight;
             float lineSpacing = EditorGUIUtility.standardVerticalSpacing;
             float lineWithSpacing = lineHeight + lineSpacing;
-            float lineHalfHeight = lineHeight / 2f;
+            float lineHalfHeight = lineHeight * 0.5f;
+            float lineDoubleSpacing = lineSpacing * 2;
 
-            float topBarHeight = lineWithSpacing * 3 + lineHalfHeight + lineSpacing * 2;
+            float topBarHeight = lineWithSpacing * 3 + lineHalfHeight + lineDoubleSpacing;
             Rect topBarRect = new(MARGIN, new Vector2(position.width - MARGIN.x * 2, topBarHeight));
-            //EditorGUI.DrawRect(topBarRect, Color.blue); //debug
             float topBarOptionsContainerWidth = 0.12f * Screen.currentResolution.width;
             var topBarMaxWidthOption = GUILayout.MaxWidth(topBarOptionsContainerWidth);
+            var topBarContainerThirdOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f);
 
-            float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineHalfHeight - lineSpacing;
-            Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineHalfHeight, topBarRect.width, bottomPartHeight);
-            //EditorGUI.DrawRect(bottomPartRect, Color.black); //debug
+            float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
+            Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineDoubleSpacing, topBarRect.width, bottomPartHeight);
 
-            float plotAreaWidth = bottomPartRect.width * 0.8f;
+            float plotAreaWidth = bottomPartRect.width * 0.85f;
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
-            //EditorGUI.DrawRect(plotAreaRect, Color.yellow); //debug
 
-            float pointEditAreaWidth = bottomPartRect.width - plotAreaWidth - lineSpacing * 2;
-            Rect pointEditAreaRect = new Rect(bottomPartRect.position + new Vector2(plotAreaRect.width + lineSpacing * 2, 0),
+            float pointEditAreaWidth = bottomPartRect.width - plotAreaWidth - lineHalfHeight;
+            Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineHalfHeight, 0),
                 new Vector2(pointEditAreaWidth, bottomPartHeight));
-            //EditorGUI.DrawRect(pointEditAreaRect, Color.green); //debug
+
+            float singlePlotAreaHeight = (plotAreaRect.height - lineHeight) * 0.5f - lineSpacing;
+            Rect intensityPlotAreaRect = new(plotAreaRect.position, new Vector2(plotAreaWidth, singlePlotAreaHeight));
+            Rect sharpnessPlotAreaRect = new(new Vector2(plotAreaRect.x, plotAreaRect.y + intensityPlotAreaRect.height + lineDoubleSpacing),
+                intensityPlotAreaRect.size);
+
+            Vector2 yAxisLabelSize = EditorStyles.label.CalcSize(Content.yAxisLabelDummy);
+            yAxisLabelSize.x += CUSTOM_LABEL_WIDTH_OFFSET;
+            yAxisLabelSize.y *= 1.5f;
+            Vector2 xAxisLabelSize = EditorStyles.label.CalcSize(Content.xAxisLabelDummy);
+            xAxisLabelSize.x *= 1.5f;
+            Vector2 plotOffsetLeftTop = new(yAxisLabelSize.x, lineWithSpacing);
+            Vector2 plotOffsetRightBottom = new(lineHalfHeight, lineWithSpacing);
+            plotScreenSize = intensityPlotAreaRect.size - plotOffsetLeftTop - plotOffsetRightBottom;
+            plotScreenSize.y -= lineSpacing;
+            Rect intensityPlotRect = new(intensityPlotAreaRect.position + plotOffsetLeftTop, plotScreenSize);
+            intensityPlotRect.y += lineSpacing;
+            Rect sharpnessPlotRect = new(sharpnessPlotAreaRect.position + plotOffsetLeftTop, plotScreenSize);
+            plotHeightOffset = sharpnessPlotRect.y - intensityPlotRect.y;
+
+            Rect scrollRect = new(intensityPlotRect.x, intensityPlotRect.y,
+                plotAreaRect.width - plotOffsetLeftTop.x - plotOffsetRightBottom.x,
+                plotAreaRect.height - plotOffsetLeftTop.y - lineDoubleSpacing);
+            plotScrollSize = new Vector2(scrollRect.width * zoom, intensityPlotRect.height);
+            Rect scrollPlotRect = new(Vector2.zero, new Vector2(plotScrollSize.x, plotScreenSize.y));
+            Rect scrollContentRect = new(0, 0, plotScrollSize.x, scrollRect.height);
+
+            int xAxisLabelCount = (int)(plotScrollSize.x / xAxisLabelSize.x);
+            float xAxisLabelWidthInterval = plotScrollSize.x / xAxisLabelCount;
+            Rect xAxisLabelRect = new(0, plotScreenSize.y + lineDoubleSpacing, xAxisLabelSize.x, xAxisLabelSize.y);
+            float xAxisLabelInterval = time / xAxisLabelCount;
+
+            int yAxisLabelCount = Mathf.RoundToInt(Mathf.Clamp(intensityPlotRect.height / yAxisLabelSize.y, 2, 11));
+            if (yAxisLabelCount < 11)
+            {
+                if (yAxisLabelCount >= 6) yAxisLabelCount = 6;
+                else if (yAxisLabelCount >= 4) yAxisLabelCount = 5;
+            }
+            float yAxisLabelInterval = 1f / (yAxisLabelCount - 1);
+            float yAxisLabelHeightInterval = plotScreenSize.y / (yAxisLabelCount - 1);
+            Rect yAxisLabelRect = new(MARGIN.x, intensityPlotRect.y - lineHalfHeight - lineDoubleSpacing,
+                plotOffsetLeftTop.x - CUSTOM_LABEL_WIDTH_OFFSET, lineHeight);
+
+            // Debug
+            if (drawRects)
+            {
+                EditorGUI.DrawRect(topBarRect, Color.blue);
+                EditorGUI.DrawRect(bottomPartRect, Color.black);
+                EditorGUI.DrawRect(plotAreaRect, Color.yellow);
+                EditorGUI.DrawRect(pointEditAreaRect, Color.green);
+                EditorGUI.DrawRect(intensityPlotAreaRect, Color.magenta);
+                EditorGUI.DrawRect(sharpnessPlotAreaRect, Color.cyan);
+                EditorGUI.DrawRect(intensityPlotRect, Color.red);
+                EditorGUI.DrawRect(sharpnessPlotRect, Color.blue);
+                EditorGUI.DrawRect(scrollRect, new Color(1, 1, 1, 0.6f));
+                EditorGUI.DrawRect(yAxisLabelRect, Color.white);
+                EditorGUI.DrawRect(new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size), Color.white);
+            }
+
+            #endregion
 
             #region Zoom and scroll handling (mouse wheel)
 
@@ -146,8 +241,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 else if (zoom > 1f)
                 {
-                    scrollPosition.x += plotSize.x * (currentEvent.delta.y > 0 ? SCROLL_INCREMENT : -SCROLL_INCREMENT);
-                    scrollPosition.x = Mathf.Clamp(scrollPosition.x, 0, plotSize.x - visiblePlotWidth);
+                    scrollPosition.x += plotScrollSize.x * (currentEvent.delta.y > 0 ? SCROLL_INCREMENT : -SCROLL_INCREMENT);
+                    scrollPosition.x = Mathf.Clamp(scrollPosition.x, 0, plotScrollSize.x - plotScreenSize.x);
                 }
                 currentEvent.Use();
             }
@@ -159,18 +254,44 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginArea(topBarRect, EditorStyles.helpBox);
             GUILayout.BeginHorizontal();
 
+            // Debug
+            GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
+            EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
+            if (GUILayout.Button("Log rects", topBarContainerThirdOption))
+            {
+                StringBuilder sb = new("Rects:\n");
+                sb.AppendLine($"Top bar: {topBarRect} (blue)");
+                sb.AppendLine($"Bottom part: {bottomPartRect} (black)");
+                sb.AppendLine($"Plot area: {plotAreaRect} (yellow)");
+                sb.AppendLine($"Point edit area: {pointEditAreaRect} (green)");
+                sb.AppendLine($"Intensity area: {intensityPlotAreaRect} (magenta)");
+                sb.AppendLine($"Intensity plot: {intensityPlotRect} (red)");
+                sb.AppendLine($"Sharpness area: {sharpnessPlotAreaRect} (cyan)");
+                sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
+                sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
+                sb.AppendLine($"Scroll rect: {yAxisLabelRect} (white)");
+                sb.AppendLine($"Scroll rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
+                Debug.Log(sb.ToString());
+            }
+            GUIContent drawRectsLabel = new("Draw Rects");
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
+            GUILayout.EndVertical();
+
             // File
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("File", EditorStyles.boldLabel);
-            ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false) as TextAsset;
             GUILayout.BeginHorizontal();
+            ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false, topBarContainerThirdOption) as TextAsset;
             GUI.enabled = ahapFile != null;
-            if (GUILayout.Button("Import"))
+            if (GUILayout.Button("Import", topBarContainerThirdOption))
                 HandleImport();
             GUI.enabled = true;
-            if (GUILayout.Button("Save"))
+            if (GUILayout.Button("Save", topBarContainerThirdOption))
                 HandleSaving();
             GUILayout.EndHorizontal();
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.projectNameLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            projectName = EditorGUILayout.TextField(Content.projectNameLabel, projectName);
             GUILayout.EndVertical();
 
             // Audio waveform
@@ -185,22 +306,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 audioWaveformVisible = false;
             }
             GUI.enabled = audioClip != null;
-            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), GUILayout.MaxWidth(30)))
+            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), EditorStyles.iconButton))
                 AudioClipUtils.PlayClip(audioClip);
             GUILayout.FlexibleSpace();
-            var waveformVisibleLabel = new GUIContent("Visible");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            audioWaveformVisible = EditorGUILayout.Toggle(waveformVisibleLabel, audioWaveformVisible);
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            EditorGUI.BeginChangeCheck();
+            audioWaveformVisible = EditorGUILayout.Toggle(Content.waveformVisibleLabel, audioWaveformVisible);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (!audioWaveformVisible)
                 lastAudioClipPaintedZoom = 0;
-            var normalizeLabel = new GUIContent("Normalize");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(normalizeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            normalize = EditorGUILayout.Toggle(normalizeLabel, normalize);
-            var renderScaleLabel = new GUIContent("Render scale");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(renderScaleLabel, renderScale),
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.normalizeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            normalizeWaveform = EditorGUILayout.Toggle(Content.normalizeLabel, normalizeWaveform);
+            if (EditorGUI.EndChangeCheck() && audioWaveformVisible)
+                shouldRepaintWaveform = true;
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(Content.renderScaleLabel, renderScale),
                 MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
             GUI.enabled = true;
             GUILayout.EndHorizontal();
@@ -210,185 +331,114 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             EditorGUILayout.LabelField("Plot", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
-            var projectNameLabel = new GUIContent("Project", "Name that will be save in project's metadata.");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(projectNameLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            projectName = EditorGUILayout.TextField(projectNameLabel, projectName);
+            if (GUILayout.Button("Reset zoom", topBarContainerThirdOption))
+                zoom = 1;
+            zoom = (float)Math.Round(EditorGUILayout.Slider("Zoom", zoom, 1, MAX_ZOOM), 1);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Clear", GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f)))
+            if (GUILayout.Button("Clear", topBarContainerThirdOption))
                 Clear();
-            if (GUILayout.Button("Reset zoom", GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f)))
-                zoom = 1;
-            var timeLabel = new GUIContent("Time");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            time = Mathf.Max(Mathf.Max(EditorGUILayout.FloatField(timeLabel, time), GetLastPointTime()), MIN_TIME);
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, time), GetLastPointTime()), MIN_TIME, MAX_TIME);
             EditorGUIUtility.labelWidth = 0;
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
 
             // Point editing
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
-            var pointDragModes = Enum.GetNames(typeof(PointDragMode));
-            for (int i = 0; i < pointDragModes.Length; i++)
-                pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);            
             pointDragMode = (PointDragMode)GUILayout.SelectionGrid((int)pointDragMode, pointDragModes, pointDragModes.Length);
             snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();
-            GUILayout.EndArea();            
+            GUILayout.EndArea();
 
             #endregion
 
-            #region Plot area
+            #region Plot Area
 
-            Rect refRect = EditorGUILayout.GetControlRect();
-            Rect bottomLine = new(new Vector2(refRect.x, position.height - lineWithSpacing), refRect.size);
-            int toplinesTaken = 4;
-            int bottomLinesTaken = 1;
-			float topOffset = toplinesTaken * lineWithSpacing + 2 * lineSpacing;
-			float bottomOffset = bottomLinesTaken * lineWithSpacing + lineSpacing;
-            Rect plotArea = position;
-            plotArea.position = new Vector2(refRect.x, topOffset);
-			plotArea.width -= plotArea.x * 2 + 10;
-			plotArea.height -= plotArea.y + bottomOffset;
-			Rect intensityPlotRect = new(plotArea);
-			GUIStyle plotTitleStyle = new(GUI.skin.label);
-			plotTitleStyle.alignment = TextAnchor.UpperCenter;
-			plotTitleStyle.fontStyle = FontStyle.Bold;
-			GUI.Label(intensityPlotRect, "Intensity", plotTitleStyle);
-			intensityPlotRect.height = (intensityPlotRect.height - lineHeight) / 2;
-			Rect sharpnessPlotRect = new(intensityPlotRect);
-			sharpnessPlotRect.position += new Vector2(0, sharpnessPlotRect.height);
-			GUI.Label(sharpnessPlotRect, "Sharpness", plotTitleStyle);
-            Vector2 plotOffset = new(35, lineWithSpacing);
-            intensityPlotRect = new(intensityPlotRect.position + plotOffset,
-                new Vector2(intensityPlotRect.width - 35, intensityPlotRect.height - plotOffset.y * 2));
-            sharpnessPlotRect = new(sharpnessPlotRect.position + plotOffset,
-                new Vector2(sharpnessPlotRect.width - 35, sharpnessPlotRect.height - plotOffset.y * 2));
-            visiblePlotWidth = intensityPlotRect.width;
+            // Plot titles
+            GUILayout.BeginArea(plotAreaRect, EditorStyles.helpBox);
+            GUILayout.EndArea();
+            GUILayout.BeginArea(intensityPlotAreaRect);
+            GUILayout.Space(lineDoubleSpacing);
+            GUILayout.Label("Intensity", Content.plotTitleStyle);
+            GUILayout.EndArea();
+            GUILayout.BeginArea(sharpnessPlotAreaRect);
+            GUILayout.Space(lineSpacing);
+            GUILayout.Label("Sharpness", Content.plotTitleStyle);
+            GUILayout.EndArea();
 
-            // Y axis labels and horizontal lines
-            int yAxisLabelCount = Mathf.Clamp((int)(intensityPlotRect.height / (lineHeight * 1.5)), 2, 11);
-            if (yAxisLabelCount < 11)
-            {
-                if (yAxisLabelCount >= 6) yAxisLabelCount = 6;
-                else if (yAxisLabelCount >= 3 && yAxisLabelCount < 5) yAxisLabelCount = 3;
-            }
-            float verticalAxisLabelInterval = 1f / (yAxisLabelCount - 1);
-            Rect intensityYAxisLabelRect = new(refRect);
-            intensityYAxisLabelRect.width = 30;
-            intensityYAxisLabelRect.position = new Vector2(intensityYAxisLabelRect.x, intensityPlotRect.y - (lineHeight / 2f));
-            Rect sharpnessYAxisLabelRect = new(intensityYAxisLabelRect);
-            sharpnessYAxisLabelRect.position = new Vector2(sharpnessYAxisLabelRect.x, sharpnessPlotRect.y - (lineHeight / 2f));
-            Vector2 yAxisLabelOffset = new(0, intensityPlotRect.height / (yAxisLabelCount - 1));
-            GUIStyle yAxisLabelStyle = new(GUI.skin.label);
-            yAxisLabelStyle.alignment = TextAnchor.MiddleRight;
-            Handles.color = COLOR_PLOT_GRID;
-            for (int i = 0; i < yAxisLabelCount; i++)
-            {
-                string label = (1 - i * verticalAxisLabelInterval).ToString("0.##");
-
-                GUI.Label(intensityYAxisLabelRect, label, yAxisLabelStyle);
-                Handles.DrawLine(new Vector3(intensityPlotRect.x, intensityYAxisLabelRect.y + lineHalfHeight),
-                    new Vector3(intensityPlotRect.x + intensityPlotRect.width, intensityYAxisLabelRect.y + lineHalfHeight));
-                intensityYAxisLabelRect.position += yAxisLabelOffset;
-
-                GUI.Label(sharpnessYAxisLabelRect, label, yAxisLabelStyle);
-                Handles.DrawLine(new Vector3(sharpnessPlotRect.x, sharpnessYAxisLabelRect.y + lineHalfHeight),
-                    new Vector3(sharpnessPlotRect.x + sharpnessPlotRect.width, sharpnessYAxisLabelRect.y + lineHalfHeight));
-                sharpnessYAxisLabelRect.position += yAxisLabelOffset;
-            }
-
-            Rect scrollArea = new(plotArea.position + plotOffset, plotArea.size - plotOffset);
-            GUIStyle xAxisLabelStyle = new(GUI.skin.label);
-            xAxisLabelStyle.alignment = TextAnchor.UpperLeft;
-
-            #endregion
-
-            #region Plot scroll
-
-            plotSize = new Vector2(scrollArea.width * zoom, intensityPlotRect.height);
-            scrollPosition = GUI.BeginScrollView(scrollArea, scrollPosition, new Rect(0, 0, plotSize.x, scrollArea.height),
+            // Scroll view
+            scrollPosition = GUI.BeginScrollView(scrollRect, scrollPosition, scrollContentRect,
                 true, false, GUI.skin.horizontalScrollbar, GUIStyle.none);
 
-            sharpnessPlotHeightOffset = sharpnessPlotRect.y - intensityPlotRect.y;
-            int xAxisLabelCount = (int)(plotSize.x / 75);
-            Vector2 xAxisLabelOffset = new(plotSize.x / (float)xAxisLabelCount, 0);
-            Rect intensityXAxisLabelRect = new(0, intensityPlotRect.height + lineSpacing, 40, lineHeight);
-            Rect sharpnessXAxisLabelRect = new(0, sharpnessPlotHeightOffset + sharpnessPlotRect.height + lineSpacing, 40, lineHeight);
-
+            // Audio waveform
             if (audioClip != null && audioWaveformVisible)
             {
-                if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || audioClip.name != lastAudioClipName || normalize != wasNormalized)
+                if (Mathf.Abs(zoom - lastAudioClipPaintedZoom) > 0.5f || shouldRepaintWaveform)
                 {
-                    audioClipTexture = AudioClipUtils.PaintAudioWaveform(audioClip, (int)(plotSize.x * renderScale), (int)(plotSize.y * renderScale), COLOR_WAVEFORM_BG, COLOR_WAVEFORM, normalize);
+                    audioClipTexture = AudioClipUtils.PaintAudioWaveform(audioClip, (int)(plotScrollSize.x * renderScale),
+                        (int)(plotScrollSize.y * renderScale), COLOR_WAVEFORM_BG, COLOR_WAVEFORM, normalizeWaveform);
                     lastAudioClipPaintedZoom = zoom;
-                    lastAudioClipName = audioClip.name;
-                    wasNormalized = normalize;
+                    shouldRepaintWaveform = false;
                 }
-                GUI.DrawTexture(new Rect(Vector2.zero, plotSize), audioClipTexture, ScaleMode.StretchToFill);
-                GUI.DrawTexture(new Rect(new Vector2(0, sharpnessPlotHeightOffset), plotSize), audioClipTexture, ScaleMode.StretchToFill);
+                GUI.DrawTexture(scrollPlotRect, audioClipTexture, ScaleMode.StretchToFill);
+                scrollPlotRect.y += plotHeightOffset;
+                GUI.DrawTexture(scrollPlotRect, audioClipTexture, ScaleMode.StretchToFill);
+                scrollPlotRect.y -= plotHeightOffset;
             }
 
-            Vector2 xAxisLabelMiddleOffset = new (20, 0);
-            GUI.Label(intensityXAxisLabelRect, "0", xAxisLabelStyle);
-            intensityXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
-            Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, 0),
-                    new Vector3(xAxisLabelOffset.x / 2, intensityPlotRect.height));
-            GUI.Label(sharpnessXAxisLabelRect, "0", xAxisLabelStyle);
-            sharpnessXAxisLabelRect.position += xAxisLabelOffset - xAxisLabelMiddleOffset;
-            Handles.DrawLine(new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset),
-                    new Vector3(xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
-            xAxisLabelStyle.alignment = TextAnchor.UpperCenter;
+            // X axis labels and vertical grid
+            Vector3 gridPoint1 = Vector2.zero;
+            Vector3 gridPoint2 = new(0, plotScreenSize.y);
+            Handles.color = COLOR_PLOT_GRID;
+            float timeLabelValue = 0;
+            string timeLabel = "0";
+            DrawTimeLabels(GUI.skin.label);
+            xAxisLabelRect.x -= xAxisLabelRect.width * 0.5f;
             for (int i = 1; i < xAxisLabelCount; i++)
             {
-                string label = (i * time / xAxisLabelCount).ToString("#0.###");
-
-                GUI.Label(intensityXAxisLabelRect, label, xAxisLabelStyle);
-                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x, 0),
-                    new Vector3(i * xAxisLabelOffset.x, intensityPlotRect.height));
-                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, 0),
-                    new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, intensityPlotRect.height));
-                intensityXAxisLabelRect.position += xAxisLabelOffset;
-
-                GUI.Label(sharpnessXAxisLabelRect, label, xAxisLabelStyle);
-                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x, sharpnessPlotHeightOffset),
-                    new Vector3(i * xAxisLabelOffset.x, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
-                Handles.DrawLine(new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset),
-                    new Vector3(i * xAxisLabelOffset.x + xAxisLabelOffset.x / 2, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
-                sharpnessXAxisLabelRect.position += xAxisLabelOffset;
+                timeLabelValue += xAxisLabelInterval;
+                timeLabel = timeLabelValue.ToString("#0.###");
+                xAxisLabelRect.x += xAxisLabelWidthInterval;
+                DrawTimeLabels(Content.xAxisLabelStyle);
+                gridPoint1.x = gridPoint2.x = gridPoint1.x + xAxisLabelWidthInterval;
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                gridPoint1.y += plotHeightOffset;
+                gridPoint2.y += plotHeightOffset;
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                gridPoint1.y -= plotHeightOffset;
+                gridPoint2.y -= plotHeightOffset;
             }
-            intensityXAxisLabelRect.position -= xAxisLabelMiddleOffset;
-            sharpnessXAxisLabelRect.position -= xAxisLabelMiddleOffset;
-            xAxisLabelStyle.alignment = TextAnchor.UpperRight;
-            xAxisLabelStyle.margin.right = 0;
-            GUI.Label(intensityXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
-            GUI.Label(sharpnessXAxisLabelRect, time.ToString("#0.##"), xAxisLabelStyle);
-                        
-            Handles.color = COLOR_PLOT_BORDER;
-            Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH, new Vector3(1, 1), new Vector3(plotSize.x - 1, 1), 
-                new Vector3(plotSize.x - 1, intensityPlotRect.height - 1), new Vector3(1, intensityPlotRect.height - 1), new Vector3(1, 1));
-            Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH, new Vector3(1, sharpnessPlotHeightOffset + 1), new Vector3(plotSize.x - 1, sharpnessPlotHeightOffset + 1),
-                new Vector3(plotSize.x - 1, sharpnessPlotHeightOffset + sharpnessPlotRect.height - 1), 
-                new Vector3(1, sharpnessPlotHeightOffset + sharpnessPlotRect.height - 1), new Vector3(1, sharpnessPlotHeightOffset + 1));
+            xAxisLabelRect.x += xAxisLabelWidthInterval - (xAxisLabelSize.x / 2);
+            timeLabel = time.ToString("#0.###");
+            DrawTimeLabels(Content.yAxisLabelStyle);
 
-            foreach (var vibraEvent in events)
+            void DrawTimeLabels(GUIStyle style)
             {
-                if (vibraEvent is TransientEvent transientEvent)
+                GUI.Label(xAxisLabelRect, timeLabel, style);
+                xAxisLabelRect.y += plotHeightOffset;
+                GUI.Label(xAxisLabelRect, timeLabel, style);
+                xAxisLabelRect.y -= plotHeightOffset;
+            }
+
+            foreach (var vibrationEvent in events)
+            {
+                if (vibrationEvent is TransientEvent transientEvent)
                 {
                     Handles.color = COLOR_EVENT_TRANSIENT;
 
                     Vector3 intensityPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Intensity.Value, MouseLocation.IntensityPlot);
                     Handles.DrawSolidDisc(intensityPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, intensityPlotRect.height));
+                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, plotScreenSize.y));
 
                     Vector3 sharpnessPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Sharpness.Value, MouseLocation.SharpnessPlot);
                     Handles.DrawSolidDisc(sharpnessPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, sharpnessPlotHeightOffset + sharpnessPlotRect.height));
+                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, plotHeightOffset + plotScreenSize.y));
                 }
-                else if (vibraEvent is ContinuousEvent continuousEvent)
+                else if (vibrationEvent is ContinuousEvent continuousEvent)
                 {
                     Handles.color = COLOR_EVENT_CONTINUOUS;
 
@@ -417,6 +467,37 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             GUI.EndScrollView();
+
+            // Y axis labels and horizontal grid
+            gridPoint1 = new(intensityPlotRect.x, intensityPlotRect.y);
+            gridPoint2 = new(intensityPlotRect.x + intensityPlotRect.width, intensityPlotRect.y);
+            Handles.color = COLOR_PLOT_GRID;
+            for (int i = 0; i < yAxisLabelCount; i++)
+            {
+                string valueLabel = (1 - i * yAxisLabelInterval).ToString("0.##");
+                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                yAxisLabelRect.y += plotHeightOffset;
+                gridPoint1.y = gridPoint2.y = gridPoint1.y + plotHeightOffset;
+                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                yAxisLabelRect.y += yAxisLabelHeightInterval - plotHeightOffset;
+                gridPoint1.y = gridPoint2.y = gridPoint1.y - plotHeightOffset + yAxisLabelHeightInterval;
+            }
+
+            Handles.color = COLOR_PLOT_BORDER;
+            DrawBorderForRect(intensityPlotRect);
+            DrawBorderForRect(sharpnessPlotRect);
+            
+            void DrawBorderForRect(Rect rect)
+            {
+                Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH,
+                    rect.position,
+                    new Vector3(rect.x + rect.width, rect.y),
+                    rect.position + rect.size,
+                    new Vector3(rect.x, rect.y + rect.height),
+                    rect.position);
+            }
 
             #endregion
 
@@ -449,7 +530,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (mouseLocation != MouseLocation.Outside)
             {
                 Handles.DrawSolidDisc(new Vector3(mousePosition.x, mousePosition.y, 0), POINT_NORMAL, HOVER_DOT_SIZE);
-                float x = (scrollPosition.x + plotRectMousePosition.x) / plotSize.x * time;
+                float x = (scrollPosition.x + plotRectMousePosition.x) / plotScrollSize.x * time;
                 float y = (intensityPlotRect.height - plotRectMousePosition.y) / intensityPlotRect.height;
                 realPlotPosition = new Vector2(x, y);
                 if (snapMode != SnapMode.None)
@@ -458,7 +539,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     y = (float)Math.Round(y, (int)snapMode);
                 }
                 plotPosition = new Vector2(x, y);
-                GUI.Label(bottomLine, $"{(mouseLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness")}: x={x}, y={y}");
+                //GUI.Label(bottomLine, $"{(mouseLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness")}: x={x}, y={y}");
 
                 // Highlight hover point
                 hoverPoint = draggedPoint ?? GetEventPointOnPosition(realPlotPosition, mouseLocation, out hoverPointEvent);
@@ -467,12 +548,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     Vector3 windowSpaceHoverPoint;
                     if (mouseLocation == MouseLocation.IntensityPlot)
                     {
-                        windowSpaceHoverPoint = new(intensityPlotRect.x + hoverPoint.Time / time * plotSize.x - scrollPosition.x, 
+                        windowSpaceHoverPoint = new(intensityPlotRect.x + hoverPoint.Time / time * plotScrollSize.x - scrollPosition.x, 
                             intensityPlotRect.y + intensityPlotRect.height - hoverPoint.Value * intensityPlotRect.height, 0);
                     }
                     else //if (mouseLocation == MouseLocation.SharpnessPlot)
                     {
-                        windowSpaceHoverPoint = new(sharpnessPlotRect.x + hoverPoint.Time / time * plotSize.x - scrollPosition.x,
+                        windowSpaceHoverPoint = new(sharpnessPlotRect.x + hoverPoint.Time / time * plotScrollSize.x - scrollPosition.x,
                             sharpnessPlotRect.y + sharpnessPlotRect.height - hoverPoint.Value * sharpnessPlotRect.height, 0);
                     }
                     Handles.color = COLOR_HOVER_POINT;
@@ -547,8 +628,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     draggedPoint = hoverPoint;
                     draggedPointEvent = hoverPointEvent;
                     
-                    dragMin = scrollPosition.x / plotSize.x * time + NEIGHBOURING_POINT_OFFSET;
-                    dragMax = (scrollPosition.x + visiblePlotWidth) / plotSize.x * time - NEIGHBOURING_POINT_OFFSET;
+                    dragMin = scrollPosition.x / plotScrollSize.x * time + NEIGHBOURING_POINT_OFFSET;
+                    dragMax = (scrollPosition.x + plotScreenSize.x) / plotScrollSize.x * time - NEIGHBOURING_POINT_OFFSET;
                     if (hoverPointEvent is ContinuousEvent continuousEvent)
                     {
                         ContinuousEvent ce = GetContinuousEventIfBetween(hoverPoint.Time);
@@ -623,8 +704,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private Vector3 PointToPlotCoords(float time, float value, MouseLocation plot)
         {
-            return new Vector3(time / this.time * plotSize.x, 
-                plotSize.y - value * plotSize.y + (plot == MouseLocation.SharpnessPlot ? sharpnessPlotHeightOffset : 0), 0);
+            return new Vector3(time / this.time * plotScrollSize.x, 
+                plotScreenSize.y - value * plotScreenSize.y + (plot == MouseLocation.SharpnessPlot ? plotHeightOffset : 0), 0);
         }
 
         private ContinuousEvent GetContinuousEventIfBetween(float time)
@@ -641,7 +722,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         private EventPoint GetEventPointOnPosition(Vector2 plotPosition, MouseLocation plot, out VibrationEvent vibrationEvent)
         {
             vibrationEvent = null;
-            Vector2 pointOffset = new(HOVER_OFFSET * time / plotSize.x, HOVER_OFFSET / plotSize.y);
+            Vector2 pointOffset = new(HOVER_OFFSET * time / plotScrollSize.x, HOVER_OFFSET / plotScreenSize.y);
             foreach (var ev in events)
             {
                 if (ev.IsOnPointInEvent(plotPosition, pointOffset, plot, out EventPoint eventPoint))
@@ -684,10 +765,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             var ahapFile = ConvertEventsToAHAPFile();
-            string json = JsonConvert.SerializeObject(ahapFile, Formatting.Indented, new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore
-            });
+            string json = JsonConvert.SerializeObject(ahapFile, Formatting.Indented,
+                new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
 
             if (this.ahapFile != null && EditorUtility.DisplayDialog("Overwrite file?", "Do you want to overwrite selected file?",
                 "Yes, overwrite", "No, create new"))

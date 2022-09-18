@@ -4,14 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2022-09-18
 ### Added
 - Sample with a script to test vibrations on gamepad via Nice Vibrations
 - *Shift* locks time and *Alt* locks value of dragged point in addition to selected point drag mode in the top UI
+- Creating continuous events now remembers mouse drag start value
 - Audio clip preview button
 
 ### Changed
-- Redesigned GUI and reworked drawing code
+- Redesigned GUI and reworked drawing code (e.g. separated input handling from drawing)
+- Dragged points are now highlighted differently
 
 ### Fixed
 - Plot X axis first and labels are now in correct positions

@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -11,7 +10,9 @@ using UnityEngine;
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
     public class AHAPEditorWindow : EditorWindow
-	{
+    {
+        #region Types, defines and variables
+
         private enum SnapMode 
         { 
             None = 0,
@@ -21,8 +22,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         }
 
         private enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
-
-        private enum MouseState { Unclicked = 0, MouseDown = 1, MouseDrag = 2 }
 
         private enum MouseButton { Left = 0, Right = 1, Middle = 2 }
 
@@ -34,6 +33,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float MAX_ZOOM = 7f;
         const float SCROLL_INCREMENT = 0.05f;
         const float HOVER_HIGHLIGHT_SIZE = 10f;
+        const float DRAG_HIGHLIGHT_SIZE = 13f;
         const float HOVER_DOT_SIZE = 3f;
         const float PLOT_EVENT_POINT_SIZE = 5f;
         const float PLOT_EVENT_LINE_WIDTH = 4f;
@@ -55,6 +55,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         static readonly Color COLOR_EVENT_CONTINUOUS = new(1f, 0.6f, 0.2f);
         static readonly Color COLOR_EVENT_CONTINUOUS_CREATION = new(1f, 0.6f, 0.2f, 0.5f);
         static readonly Color COLOR_HOVER_POINT = new(0.8f, 0.8f, 0.8f, 0.2f);
+        static readonly Color COLOR_DRAG_POINT = new(0.7f, 1f, 1f, 0.3f);
         static readonly Color COLOR_HOVER_GUIDES = new(0.7f, 0f, 0f);
 
         class Content
@@ -75,44 +76,43 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         // Data
         TextAsset ahapFile;
-		float zoom = 1f;
         float time = 1f;        
         string projectName = "";
         List<VibrationEvent> events = new();
-        Vector2 scrollPositionOld = Vector2.zero;
-        Vector2 scrolledPlotSizeOld = Vector2.one;
-        PointDragMode pointDragMode = PointDragMode.FreeMove;
-        SnapMode snapMode = SnapMode.None;
-        MouseState mouseState = MouseState.Unclicked;
+
+        // Drawing
+        float zoom = 1f;
+        Vector2 plotScreenSize; // Size of single plot rect on screen
+        Vector2 plotScrollSize; // Size of scroll view
+        Vector2 scrollPosition;
+        float plotHeightOffset; // Difference between plots top left corner
+        EventType previousMouseState = EventType.MouseUp;
         MouseLocation mouseLocation = MouseLocation.Outside;
-        MouseLocation mouseClickLocation = MouseLocation.Outside;        
+        MouseLocation mouseClickLocation = MouseLocation.Outside;
+        Vector2 mouseClickPosition;
         Vector2 mouseClickPlotPosition;
-        float continuousEventWindowPos;
-        float sharpnessPlotHeightOffsetOld;
         EventPoint hoverPoint = null;
         VibrationEvent hoverPointEvent = null;
         EventPoint draggedPoint = null;
         VibrationEvent draggedPointEvent = null;
         float dragMin, dragMax;
+        string[] pointDragModes;
+        PointDragMode pointDragMode = PointDragMode.FreeMove;
+        SnapMode snapMode = SnapMode.None;
                 
         // Audio waveform
         AudioClip audioClip;
+        Texture2D audioClipTexture;
+        bool shouldRepaintWaveform = false;
         bool audioWaveformVisible = false;
         float lastAudioClipPaintedZoom = 1f;
-        Texture2D audioClipTexture;
         bool normalizeWaveform;
         float renderScale = 1f;
-        bool shouldRepaintWaveform = false;
-
-        // Help data NEW        
-        Vector2 plotScreenSize; // Size of single plot rect on screen
-        Vector2 plotScrollSize; // Size of scroll view
-        Vector2 scrollPosition;
-        float plotHeightOffset; // Difference between plots top left corner
-        string[] pointDragModes;
-
-        // Debug
+        
+		// Debug
         bool drawRects;
+
+        #endregion
 
         [MenuItem("Window/AHAP Editor")]
         public static void OpenWindow()
@@ -162,10 +162,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
             Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineDoubleSpacing, topBarRect.width, bottomPartHeight);
 
-            float plotAreaWidth = bottomPartRect.width * 0.85f;
+            float plotAreaWidth = bottomPartRect.width * 1f;
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
 
-            float pointEditAreaWidth = bottomPartRect.width - plotAreaWidth - lineHalfHeight;
+            float pointEditAreaWidth = Mathf.Max(bottomPartRect.width - plotAreaWidth - lineHalfHeight, 0);
             Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineHalfHeight, 0),
                 new Vector2(pointEditAreaWidth, bottomPartHeight));
 
@@ -208,7 +208,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
             float yAxisLabelInterval = 1f / (yAxisLabelCount - 1);
             float yAxisLabelHeightInterval = plotScreenSize.y / (yAxisLabelCount - 1);
-            Rect yAxisLabelRect = new(MARGIN.x, intensityPlotRect.y - lineHalfHeight - lineDoubleSpacing,
+            Rect yAxisLabelRect = new(MARGIN.x, intensityPlotRect.y - lineHalfHeight - lineSpacing,
                 plotOffsetLeftTop.x - CUSTOM_LABEL_WIDTH_OFFSET, lineHeight);
 
             // Debug
@@ -229,8 +229,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #endregion
 
-            #region Zoom and scroll handling (mouse wheel)
+            #region Mouse handling
 
+            // Zoom and scroll (mouse wheel)
             var currentEvent = UnityEngine.Event.current;
             if (currentEvent.type == EventType.ScrollWheel)
             {
@@ -247,36 +248,190 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 currentEvent.Use();
             }
 
+            bool mouseOnWindow = mouseOverWindow == this;
+            Vector2 plotRectMousePosition = Vector2.zero; // Mouse position inside plot rect mouse is over
+            Vector2 plotPosition = Vector2.zero; // Mouse position in plot space with snapping
+            Rect mousePlotRect = intensityPlotRect; // Plot rect mouse is on
+            Rect otherPlotRect = sharpnessPlotRect; // The other plot rect
+            mouseLocation = MouseLocation.Outside;
+            if (mouseOnWindow)
+            {
+                if (intensityPlotRect.Contains(currentEvent.mousePosition))
+                {
+                    mouseLocation = MouseLocation.IntensityPlot;
+                }
+                else if (sharpnessPlotRect.Contains(currentEvent.mousePosition))
+                {
+                    mouseLocation = MouseLocation.SharpnessPlot;
+                    mousePlotRect = sharpnessPlotRect;
+                    otherPlotRect = intensityPlotRect;
+                }
+            }
+
+            if (mouseLocation != MouseLocation.Outside)
+            {
+                plotRectMousePosition = currentEvent.mousePosition - mousePlotRect.position;
+                float x = (scrollPosition.x + plotRectMousePosition.x) / plotScrollSize.x * time;
+                float y = (plotScreenSize.y - plotRectMousePosition.y) / plotScreenSize.y;
+                if (snapMode != SnapMode.None)
+                {
+                    x = (float)Math.Round(x, (int)snapMode);
+                    y = (float)Math.Round(y, (int)snapMode);
+                }
+                plotPosition = new Vector2(x, y);
+
+                hoverPoint = draggedPoint ?? GetEventPointOnPosition(plotPosition, mouseLocation, out hoverPointEvent);
+
+                if (currentEvent.button == (int)MouseButton.Left) // LMB event
+                {
+                    if (hoverPoint == null) // Not hovering over point
+                    {
+                        if (previousMouseState == EventType.MouseUp && currentEvent.type == EventType.MouseDown) // LMB down
+                        {
+                            mouseClickPosition = currentEvent.mousePosition;
+                            mouseClickLocation = mouseLocation;
+                            mouseClickPlotPosition = plotPosition;
+                            previousMouseState = EventType.MouseDown;
+                        }
+                        else if (previousMouseState == EventType.MouseDown && currentEvent.type == EventType.MouseDrag) // Start dragging if not between continuous event points
+                        {
+                            previousMouseState = TryGetContinuousEventOnTime(plotPosition.x, out _) ? EventType.MouseUp : EventType.MouseDrag;
+                        }
+                        else if (currentEvent.type == EventType.MouseUp && mouseClickLocation == mouseLocation) // LMB up
+                        {
+                            if (previousMouseState == EventType.MouseDown) // Just clicked
+                            {
+                                if (TryGetContinuousEventOnTime(plotPosition.x, out ContinuousEvent ce)) // Add point to continuous event if clicked between start and end
+                                {
+                                    ce.AddPointToCurve(plotPosition, mouseLocation);
+                                }
+                                else // Add transient event
+                                {
+                                    events.Add(new TransientEvent(plotPosition.x,
+                                        mouseLocation == MouseLocation.IntensityPlot ? plotPosition.y : 0.5f,
+                                        mouseLocation == MouseLocation.SharpnessPlot ? plotPosition.y : 0.5f));
+                                }
+                            }
+                            else if (previousMouseState == EventType.MouseDrag && !TryGetContinuousEventOnTime(plotPosition.x, out _))
+                            {
+                                Vector2 leftPoint = mouseClickPlotPosition;
+                                Vector2 rightPoint = plotPosition;
+                                if (leftPoint.x > rightPoint.x)
+                                    (leftPoint, rightPoint) = (rightPoint, leftPoint);
+                                events.Add(new ContinuousEvent(new Vector2(leftPoint.x, rightPoint.x),
+                                    mouseLocation == MouseLocation.IntensityPlot ? new Vector2(leftPoint.y, rightPoint.y) : Vector2.one * 0.5f,
+                                    mouseLocation == MouseLocation.SharpnessPlot ? new Vector2(leftPoint.y, rightPoint.y) : Vector2.one * 0.5f));
+                            }
+                            previousMouseState = EventType.MouseUp;
+                        }
+                    }
+                    else if (draggedPoint == null && currentEvent.type == EventType.MouseDown) // Hovering over point - start dragging it
+                    {
+                        previousMouseState = EventType.MouseDown;
+                        draggedPoint = hoverPoint;
+                        draggedPointEvent = hoverPointEvent;
+                        dragMin = scrollPosition.x / plotScrollSize.x * time + NEIGHBOURING_POINT_OFFSET;
+                        dragMax = (scrollPosition.x + plotScreenSize.x) / plotScrollSize.x * time - NEIGHBOURING_POINT_OFFSET;
+                        mouseClickLocation = mouseLocation;
+
+                        if (draggedPointEvent is ContinuousEvent continuousEvent)
+                        {
+                            var curve = mouseLocation == MouseLocation.IntensityPlot ? continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
+                            if (draggedPoint == curve[0])
+                            {
+                                var previousEvent = events.FindLast(ev => ev.Time < draggedPoint.Time && ev is ContinuousEvent);
+                                if (previousEvent != null)
+                                    dragMin = ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + NEIGHBOURING_POINT_OFFSET;
+                                dragMax = curve.Find(point => point.Time > draggedPoint.Time).Time - NEIGHBOURING_POINT_OFFSET;
+                            }
+                            else if (draggedPoint == curve.Last())
+                            {
+                                var nextEvent = events.Find(ev => ev.Time > draggedPoint.Time && ev is ContinuousEvent);
+                                if (nextEvent != null)
+                                    dragMax = nextEvent.Time - NEIGHBOURING_POINT_OFFSET;
+                                dragMin = curve.FindLast(point => point.Time < draggedPoint.Time).Time + NEIGHBOURING_POINT_OFFSET;
+                            }
+                            else
+                            {
+                                dragMin = curve.FindLast(point => point.Time < draggedPoint.Time).Time + NEIGHBOURING_POINT_OFFSET;
+                                dragMax = curve.Find(point => point.Time > draggedPoint.Time).Time - NEIGHBOURING_POINT_OFFSET;
+                            }
+                        }
+                    }
+                    else if (draggedPoint != null) // Dragging point
+                    {
+                        if (currentEvent.type == EventType.MouseDrag && mouseLocation == mouseClickLocation) // Handle dragging
+                        {
+                            if (pointDragMode != PointDragMode.LockTime && !currentEvent.shift)
+                                draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
+                            if (pointDragMode != PointDragMode.LockValue && !currentEvent.alt)
+                                draggedPoint.Value = Mathf.Clamp(plotPosition.y, 0, 1);
+                            if (draggedPointEvent is TransientEvent te)
+                            {
+                                te.Time = te.Intensity.Time = te.Sharpness.Time = draggedPoint.Time;
+                            }
+                            else if (draggedPointEvent is ContinuousEvent ce)
+                            {
+                                if (draggedPoint == ce.IntensityCurve.First() || draggedPoint == ce.SharpnessCurve.First())
+                                    ce.Time = ce.IntensityCurve.First().Time = ce.SharpnessCurve.First().Time = draggedPoint.Time;
+                                else if (draggedPoint == ce.IntensityCurve.Last() || draggedPoint == ce.SharpnessCurve.Last())
+                                    ce.IntensityCurve.Last().Time = ce.SharpnessCurve.Last().Time = draggedPoint.Time;
+                            }
+                            previousMouseState = EventType.MouseDrag;
+                        }
+                    }
+                }
+                else if (currentEvent.type == EventType.MouseUp && hoverPoint != null &&
+                    ((currentEvent.button == (int)MouseButton.Right && hoverPointEvent.ShouldRemoveEventAfterRemovingPoint(hoverPoint, mouseLocation)) ||
+                    currentEvent.button == (int)MouseButton.Middle)) // Delete point
+                {
+                    events.Remove(hoverPointEvent);
+                    hoverPoint = null;
+                    hoverPointEvent = null;
+                }
+            }
+            if (currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseUp)
+            {
+                draggedPoint = null;
+                draggedPointEvent = null;
+                previousMouseState = EventType.MouseUp;
+                if (mouseLocation == MouseLocation.Outside)
+                {
+                    hoverPoint = null;
+                    hoverPointEvent = null;
+                }
+            }
+            
             #endregion
 
-            #region Top Bar
+            #region Draw Top Bar
 
             GUILayout.BeginArea(topBarRect, EditorStyles.helpBox);
             GUILayout.BeginHorizontal();
 
-            // Debug
-            GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
-            EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
-            if (GUILayout.Button("Log rects", topBarContainerThirdOption))
-            {
-                StringBuilder sb = new("Rects:\n");
-                sb.AppendLine($"Top bar: {topBarRect} (blue)");
-                sb.AppendLine($"Bottom part: {bottomPartRect} (black)");
-                sb.AppendLine($"Plot area: {plotAreaRect} (yellow)");
-                sb.AppendLine($"Point edit area: {pointEditAreaRect} (green)");
-                sb.AppendLine($"Intensity area: {intensityPlotAreaRect} (magenta)");
-                sb.AppendLine($"Intensity plot: {intensityPlotRect} (red)");
-                sb.AppendLine($"Sharpness area: {sharpnessPlotAreaRect} (cyan)");
-                sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
-                sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
-                sb.AppendLine($"Scroll rect: {yAxisLabelRect} (white)");
-                sb.AppendLine($"Scroll rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
-                Debug.Log(sb.ToString());
-            }
-            GUIContent drawRectsLabel = new("Draw Rects");
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
-            GUILayout.EndVertical();
+            // GUI Debug
+            //GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
+            //EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
+            //if (GUILayout.Button("Log rects", topBarContainerThirdOption))
+            //{
+            //    StringBuilder sb = new("Rects:\n");
+            //    sb.AppendLine($"Top bar: {topBarRect} (blue)");
+            //    sb.AppendLine($"Bottom part: {bottomPartRect} (black)");
+            //    sb.AppendLine($"Plot area: {plotAreaRect} (yellow)");
+            //    sb.AppendLine($"Point edit area: {pointEditAreaRect} (green)");
+            //    sb.AppendLine($"Intensity area: {intensityPlotAreaRect} (magenta)");
+            //    sb.AppendLine($"Intensity plot: {intensityPlotRect} (red)");
+            //    sb.AppendLine($"Sharpness area: {sharpnessPlotAreaRect} (cyan)");
+            //    sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
+            //    sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
+            //    sb.AppendLine($"Scroll rect: {yAxisLabelRect} (white)");
+            //    sb.AppendLine($"Scroll rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
+            //    Debug.Log(sb.ToString());
+            //}
+            //GUIContent drawRectsLabel = new("Draw Rects");
+            //EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            //drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
+            //GUILayout.EndVertical();
 
             // File
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
@@ -356,7 +511,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #endregion
 
-            #region Plot Area
+            #region Draw Plot Area
 
             // Plot titles
             GUILayout.BeginArea(plotAreaRect, EditorStyles.helpBox);
@@ -369,6 +524,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.Space(lineSpacing);
             GUILayout.Label("Sharpness", Content.plotTitleStyle);
             GUILayout.EndArea();
+
+            // Y axis labels and horizontal grid
+            Vector3 gridPoint1 = new(intensityPlotRect.x, intensityPlotRect.y);
+            Vector3 gridPoint2 = new(intensityPlotRect.x + intensityPlotRect.width, intensityPlotRect.y);
+            Handles.color = COLOR_PLOT_GRID;
+            for (int i = 0; i < yAxisLabelCount; i++)
+            {
+                string valueLabel = (1 - i * yAxisLabelInterval).ToString("0.##");
+                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                yAxisLabelRect.y += plotHeightOffset;
+                gridPoint1.y = gridPoint2.y = gridPoint1.y + plotHeightOffset;
+                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
+                Handles.DrawLine(gridPoint1, gridPoint2);
+                yAxisLabelRect.y += yAxisLabelHeightInterval - plotHeightOffset;
+                gridPoint1.y = gridPoint2.y = gridPoint1.y - plotHeightOffset + yAxisLabelHeightInterval;
+            }
 
             // Scroll view
             scrollPosition = GUI.BeginScrollView(scrollRect, scrollPosition, scrollContentRect,
@@ -391,8 +563,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             // X axis labels and vertical grid
-            Vector3 gridPoint1 = Vector2.zero;
-            Vector3 gridPoint2 = new(0, plotScreenSize.y);
+            gridPoint1 = Vector2.zero;
+            gridPoint2 = new(0, plotScreenSize.y);
             Handles.color = COLOR_PLOT_GRID;
             float timeLabelValue = 0;
             string timeLabel = "0";
@@ -424,67 +596,99 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 xAxisLabelRect.y -= plotHeightOffset;
             }
 
+            // Events
             foreach (var vibrationEvent in events)
             {
                 if (vibrationEvent is TransientEvent transientEvent)
                 {
                     Handles.color = COLOR_EVENT_TRANSIENT;
 
-                    Vector3 intensityPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Intensity.Value, MouseLocation.IntensityPlot);
+                    Vector3 intensityPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Intensity.Value);
                     Handles.DrawSolidDisc(intensityPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, plotScreenSize.y));
 
-                    Vector3 sharpnessPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Sharpness.Value, MouseLocation.SharpnessPlot);
+                    Vector3 sharpnessPoint = PointToPlotCoords(transientEvent.Time, transientEvent.Sharpness.Value, plotHeightOffset);
                     Handles.DrawSolidDisc(sharpnessPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
                     Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, plotHeightOffset + plotScreenSize.y));
                 }
                 else if (vibrationEvent is ContinuousEvent continuousEvent)
                 {
                     Handles.color = COLOR_EVENT_CONTINUOUS;
+                    DrawContinuousEvent(continuousEvent.IntensityCurve);
+                    DrawContinuousEvent(continuousEvent.SharpnessCurve, plotHeightOffset);
 
-                    List<Vector3> points = new();
-                    points.Add(PointToPlotCoords(continuousEvent.IntensityCurve[0].Time, 0, MouseLocation.IntensityPlot));
-                    for (int i = 0; i < continuousEvent.IntensityCurve.Count; i++)
+                    void DrawContinuousEvent(List<EventPoint> curve, float heightOffset = 0)
                     {
-                        EventPoint point = continuousEvent.IntensityCurve[i];
-                        points.Add(PointToPlotCoords(point.Time, point.Value, MouseLocation.IntensityPlot));
-                        Handles.DrawSolidDisc(points.Last(), POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                        List<Vector3> points = new() { PointToPlotCoords(curve[0].Time, 0, heightOffset) };
+                        int pointCount = curve.Count;
+                        for (int i = 0; i < pointCount; i++)
+                        {
+                            EventPoint point = curve[i];
+                            points.Add(PointToPlotCoords(point.Time, point.Value, heightOffset));
+                            Handles.DrawSolidDisc(points.Last(), POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                        }
+                        points.Add(PointToPlotCoords(curve[pointCount - 1].Time, 0, heightOffset));
+                        Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
                     }
-                    points.Add(PointToPlotCoords(continuousEvent.IntensityCurve.Last().Time, 0, MouseLocation.IntensityPlot));
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
-
-                    points.Clear();
-                    points.Add(PointToPlotCoords(continuousEvent.SharpnessCurve[0].Time, 0, MouseLocation.SharpnessPlot));
-                    for (int i = 0; i < continuousEvent.SharpnessCurve.Count; i++)
-                    {
-                        EventPoint point = continuousEvent.SharpnessCurve[i];
-                        points.Add(PointToPlotCoords(point.Time, point.Value, MouseLocation.SharpnessPlot));
-                        Handles.DrawSolidDisc(points.Last(), POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
-                    }
-                    points.Add(PointToPlotCoords(continuousEvent.SharpnessCurve.Last().Time, 0, MouseLocation.SharpnessPlot));
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
                 }
             }
 
             GUI.EndScrollView();
 
-            // Y axis labels and horizontal grid
-            gridPoint1 = new(intensityPlotRect.x, intensityPlotRect.y);
-            gridPoint2 = new(intensityPlotRect.x + intensityPlotRect.width, intensityPlotRect.y);
-            Handles.color = COLOR_PLOT_GRID;
-            for (int i = 0; i < yAxisLabelCount; i++)
+            if (mouseLocation != MouseLocation.Outside)
             {
-                string valueLabel = (1 - i * yAxisLabelInterval).ToString("0.##");
-                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
-                Handles.DrawLine(gridPoint1, gridPoint2);
-                yAxisLabelRect.y += plotHeightOffset;
-                gridPoint1.y = gridPoint2.y = gridPoint1.y + plotHeightOffset;
-                GUI.Label(yAxisLabelRect, valueLabel, Content.yAxisLabelStyle);
-                Handles.DrawLine(gridPoint1, gridPoint2);
-                yAxisLabelRect.y += yAxisLabelHeightInterval - plotHeightOffset;
-                gridPoint1.y = gridPoint2.y = gridPoint1.y - plotHeightOffset + yAxisLabelHeightInterval;
+                // Hover helper lines
+                Handles.color = COLOR_HOVER_GUIDES;
+                Handles.DrawLine(new Vector3(currentEvent.mousePosition.x, otherPlotRect.y),
+                    new Vector3(currentEvent.mousePosition.x, otherPlotRect.y + otherPlotRect.height));
+                Handles.DrawLine(new Vector3(currentEvent.mousePosition.x, mousePlotRect.y),
+                    new Vector3(currentEvent.mousePosition.x, mousePlotRect.y + mousePlotRect.height));
+                Handles.DrawLine(new Vector3(mousePlotRect.x, currentEvent.mousePosition.y),
+                    new Vector3(mousePlotRect.x + mousePlotRect.width, currentEvent.mousePosition.y));
+                Handles.DrawSolidDisc(new Vector3(currentEvent.mousePosition.x, currentEvent.mousePosition.y),
+                    POINT_NORMAL, HOVER_DOT_SIZE);
+
+                // Continuous event creation
+                if (draggedPoint == null && currentEvent.button == (int)MouseButton.Left && previousMouseState == EventType.MouseDrag && mouseLocation == mouseClickLocation)
+                {
+                    Vector3 leftPoint = currentEvent.mousePosition;
+                    Vector3 rightPoint = mouseClickPosition;
+                    if (mouseClickPosition.x < currentEvent.mousePosition.x)
+                    {
+                        leftPoint = mouseClickPosition;
+                        rightPoint = currentEvent.mousePosition;
+                    }
+                    Handles.color = COLOR_EVENT_CONTINUOUS_CREATION;
+                    Handles.DrawAAConvexPolygon(leftPoint, rightPoint, new Vector3(rightPoint.x, mousePlotRect.y + mousePlotRect.height),
+                        new Vector3(leftPoint.x, mousePlotRect.y + mousePlotRect.height), leftPoint);
+                }
             }
 
+            // Drag and hover point highlight
+            EventPoint highlightedPoint = null;
+            float highlightSize = 0f;
+            Rect highlightRect = mousePlotRect;
+            if (draggedPoint != null)
+            {
+                Handles.color = COLOR_DRAG_POINT;
+                highlightedPoint = draggedPoint;
+                highlightSize = DRAG_HIGHLIGHT_SIZE;
+                highlightRect = mouseClickLocation == MouseLocation.IntensityPlot ? intensityPlotRect : sharpnessPlotRect;
+            }
+            else if (hoverPoint != null && mouseLocation != MouseLocation.Outside)
+            {
+                Handles.color = COLOR_HOVER_POINT;
+                highlightedPoint = hoverPoint;
+                highlightSize = HOVER_HIGHLIGHT_SIZE;
+            }
+            if (highlightedPoint != null)
+            {
+                Vector3 highlightedPointCoords = new(highlightRect.x + highlightedPoint.Time / time * plotScrollSize.x - scrollPosition.x,
+                    highlightRect.y + highlightRect.height - highlightedPoint.Value * highlightRect.height);
+                Handles.DrawSolidDisc(highlightedPointCoords, POINT_NORMAL, highlightSize);
+            }
+
+            // Plot borders
             Handles.color = COLOR_PLOT_BORDER;
             DrawBorderForRect(intensityPlotRect);
             DrawBorderForRect(sharpnessPlotRect);
@@ -500,223 +704,31 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             #endregion
-
-            #region Mouse location
-
-            Handles.color = COLOR_HOVER_GUIDES;
-            Vector2 mousePosition = currentEvent.mousePosition;
-            Vector2 plotPosition = Vector2.negativeInfinity;
-            Vector2 plotRectMousePosition = Vector2.negativeInfinity;
-            Vector2 realPlotPosition = Vector2.zero;
-            if (intensityPlotRect.Contains(mousePosition))
-            {
-                mouseLocation = MouseLocation.IntensityPlot;
-                Handles.DrawLine(new Vector3(mousePosition.x, sharpnessPlotRect.y), 
-                    new Vector3(mousePosition.x, sharpnessPlotRect.y + sharpnessPlotRect.height));
-                plotRectMousePosition = mousePosition - intensityPlotRect.position;
-            }
-            else if (sharpnessPlotRect.Contains(mousePosition))
-            {
-                mouseLocation = MouseLocation.SharpnessPlot;
-                Handles.DrawLine(new Vector3(mousePosition.x, intensityPlotRect.y),
-                    new Vector3(mousePosition.x, intensityPlotRect.y + intensityPlotRect.height));
-                plotRectMousePosition = mousePosition - sharpnessPlotRect.position;
-            }
-            else
-            {
-                mouseLocation = MouseLocation.Outside;
-            }
-
-            if (mouseLocation != MouseLocation.Outside)
-            {
-                Handles.DrawSolidDisc(new Vector3(mousePosition.x, mousePosition.y, 0), POINT_NORMAL, HOVER_DOT_SIZE);
-                float x = (scrollPosition.x + plotRectMousePosition.x) / plotScrollSize.x * time;
-                float y = (intensityPlotRect.height - plotRectMousePosition.y) / intensityPlotRect.height;
-                realPlotPosition = new Vector2(x, y);
-                if (snapMode != SnapMode.None)
-                {
-                    x = (float)Math.Round(x, (int)snapMode);
-                    y = (float)Math.Round(y, (int)snapMode);
-                }
-                plotPosition = new Vector2(x, y);
-                //GUI.Label(bottomLine, $"{(mouseLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness")}: x={x}, y={y}");
-
-                // Highlight hover point
-                hoverPoint = draggedPoint ?? GetEventPointOnPosition(realPlotPosition, mouseLocation, out hoverPointEvent);
-                if (hoverPoint != null)
-                {
-                    Vector3 windowSpaceHoverPoint;
-                    if (mouseLocation == MouseLocation.IntensityPlot)
-                    {
-                        windowSpaceHoverPoint = new(intensityPlotRect.x + hoverPoint.Time / time * plotScrollSize.x - scrollPosition.x, 
-                            intensityPlotRect.y + intensityPlotRect.height - hoverPoint.Value * intensityPlotRect.height, 0);
-                    }
-                    else //if (mouseLocation == MouseLocation.SharpnessPlot)
-                    {
-                        windowSpaceHoverPoint = new(sharpnessPlotRect.x + hoverPoint.Time / time * plotScrollSize.x - scrollPosition.x,
-                            sharpnessPlotRect.y + sharpnessPlotRect.height - hoverPoint.Value * sharpnessPlotRect.height, 0);
-                    }
-                    Handles.color = COLOR_HOVER_POINT;
-                    Handles.DrawSolidDisc(windowSpaceHoverPoint, POINT_NORMAL, HOVER_HIGHLIGHT_SIZE);
-                }
-            }
-
-            #endregion
-
-            #region Mouse click
-
-            if (currentEvent.button == (int)MouseButton.Left)
-            {
-                if (hoverPoint == null)
-                {
-                    if (mouseLocation != MouseLocation.Outside && mouseState == MouseState.Unclicked && currentEvent.type == EventType.MouseDown)
-                    {
-                        mouseState = MouseState.MouseDown;
-                        mouseClickLocation = mouseLocation;
-                        mouseClickPlotPosition = plotPosition;
-                        continuousEventWindowPos = mousePosition.x;
-                    }
-                    else if (mouseState == MouseState.MouseDown && currentEvent.type == EventType.MouseDrag)
-                    {
-                        mouseState = GetContinuousEventIfBetween(plotPosition.x) != null ? MouseState.Unclicked : MouseState.MouseDrag;
-                    }
-                    else if (mouseState != MouseState.Unclicked && currentEvent.type == EventType.MouseUp)
-                    {
-                        if (mouseClickLocation == mouseLocation)
-                        {
-                            if (mouseState == MouseState.MouseDown) // Add transient event or continuous event point
-                            {
-                                ContinuousEvent ce = GetContinuousEventIfBetween(plotPosition.x);
-                                if (ce == null)
-                                {
-                                    events.Add(new TransientEvent(plotPosition.x,
-                                        mouseLocation == MouseLocation.IntensityPlot ? plotPosition.y : 0.5f,
-                                        mouseLocation == MouseLocation.SharpnessPlot ? plotPosition.y : 0.5f));
-                                }
-                                else
-                                {
-                                    if (mouseLocation == MouseLocation.IntensityPlot)
-                                    {
-                                        ce.IntensityCurve.Add(plotPosition);
-                                        ce.IntensityCurve.Sort((p1, p2) => p1.Time.CompareTo(p2.Time));
-                                    }
-                                    else if (mouseLocation == MouseLocation.SharpnessPlot)
-                                    {
-                                        ce.SharpnessCurve.Add(plotPosition);
-                                        ce.SharpnessCurve.Sort((p1, p2) => p1.Time.CompareTo(p2.Time));
-                                    }
-                                }
-                            }
-                            else if (mouseState == MouseState.MouseDrag && GetContinuousEventIfBetween(plotPosition.x) == null) // Add continuous event
-                            {
-                                events.Add(new ContinuousEvent(new Vector2(Mathf.Min(mouseClickPlotPosition.x, plotPosition.x), Mathf.Max(mouseClickPlotPosition.x, plotPosition.x)),
-                                    mouseLocation == MouseLocation.IntensityPlot ? new Vector2(plotPosition.y, plotPosition.y) : Vector2.one * 0.5f,
-                                    mouseLocation == MouseLocation.SharpnessPlot ? new Vector2(plotPosition.y, plotPosition.y) : Vector2.one * 0.5f));
-                            }
-                        }
-                        mouseState = MouseState.Unclicked;
-                    }
-                    else if (mouseState == MouseState.MouseDrag && mouseLocation == mouseClickLocation)
-                    {
-                        EditorGUI.DrawRect(new Rect(continuousEventWindowPos, mousePosition.y, mousePosition.x - continuousEventWindowPos,
-                            mouseLocation == MouseLocation.IntensityPlot ? intensityPlotRect.y + intensityPlotRect.height - mousePosition.y :
-                            sharpnessPlotRect.y + sharpnessPlotRect.height - mousePosition.y), COLOR_EVENT_CONTINUOUS_CREATION);
-                    }
-                }
-                else if (draggedPoint == null && currentEvent.type == EventType.MouseDown)
-                {
-                    draggedPoint = hoverPoint;
-                    draggedPointEvent = hoverPointEvent;
-                    
-                    dragMin = scrollPosition.x / plotScrollSize.x * time + NEIGHBOURING_POINT_OFFSET;
-                    dragMax = (scrollPosition.x + plotScreenSize.x) / plotScrollSize.x * time - NEIGHBOURING_POINT_OFFSET;
-                    if (hoverPointEvent is ContinuousEvent continuousEvent)
-                    {
-                        ContinuousEvent ce = GetContinuousEventIfBetween(hoverPoint.Time);
-                        if (ce != null)
-                        {
-                            var curve = mouseLocation == MouseLocation.IntensityPlot ? continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
-                            dragMin = curve.FindLast(point => point.Time < hoverPoint.Time).Time + NEIGHBOURING_POINT_OFFSET;
-                            dragMax = curve.Find(point => point.Time > hoverPoint.Time).Time - NEIGHBOURING_POINT_OFFSET;
-                        }
-                        else if (draggedPoint == continuousEvent.IntensityCurve.First() || draggedPoint == continuousEvent.SharpnessCurve.First())
-                        {
-                            dragMax = Mathf.Min(continuousEvent.IntensityCurve[1].Time, continuousEvent.SharpnessCurve[1].Time) - NEIGHBOURING_POINT_OFFSET;
-                            var previousEvent = events.FindLast(ev => ev.Time < hoverPoint.Time && ev is ContinuousEvent);
-                            if (previousEvent != null)
-                                dragMin = ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + NEIGHBOURING_POINT_OFFSET;
-                        }
-                        else if (draggedPoint == continuousEvent.IntensityCurve.Last() || draggedPoint == continuousEvent.SharpnessCurve.Last())
-                        {
-                            dragMin = Mathf.Max(continuousEvent.IntensityCurve[continuousEvent.IntensityCurve.Count - 2].Time,
-                                continuousEvent.SharpnessCurve[continuousEvent.SharpnessCurve.Count - 2].Time) + NEIGHBOURING_POINT_OFFSET;
-                            var nextEvent = events.Find(ev => ev.Time > hoverPoint.Time && ev is ContinuousEvent);
-                            if (nextEvent != null)
-                                dragMax = ((ContinuousEvent)nextEvent).IntensityCurve.First().Time - NEIGHBOURING_POINT_OFFSET;
-                        }
-                    }
-
-                    mouseClickLocation = mouseLocation;
-                }
-                else if (draggedPoint != null)
-                {
-                    if (currentEvent.type == EventType.MouseDrag && mouseLocation == mouseClickLocation)
-                    {
-                        if (pointDragMode != PointDragMode.LockTime && !currentEvent.shift)
-                            draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
-                        if (pointDragMode != PointDragMode.LockValue && !currentEvent.alt)
-                            draggedPoint.Value = Mathf.Clamp(plotPosition.y, 0, 1);
-                        if (draggedPointEvent is TransientEvent te)
-                        {
-                            te.Time = te.Intensity.Time = te.Sharpness.Time = draggedPoint.Time;
-                        }
-                        else if (draggedPointEvent is ContinuousEvent ce)
-                        {
-                            if (draggedPoint == ce.IntensityCurve.First() || draggedPoint == ce.SharpnessCurve.First())
-                                ce.Time = ce.IntensityCurve.First().Time = ce.SharpnessCurve.First().Time = draggedPoint.Time;
-                            else if (draggedPoint == ce.IntensityCurve.Last() || draggedPoint == ce.SharpnessCurve.Last())
-                                ce.IntensityCurve.Last().Time = ce.SharpnessCurve.Last().Time = draggedPoint.Time;
-                        }
-                    }
-                    else if (currentEvent.type == EventType.MouseUp)
-                    {
-                        draggedPoint = null;
-                        draggedPointEvent = null;
-                    }
-                }
-            }
-            else if (currentEvent.type == EventType.MouseUp && mouseLocation != MouseLocation.Outside && hoverPoint != null && 
-                ((currentEvent.button == (int)MouseButton.Right && hoverPointEvent.ShouldRemoveEventAfterRemovingPoint(hoverPoint, mouseLocation)) || 
-                currentEvent.button == (int)MouseButton.Middle))
-            {
-                events.Remove(hoverPointEvent);
-                hoverPoint = null;
-                hoverPointEvent = null;
-            }
-
-            #endregion
-
-            if (mouseOverWindow == this)
+                        
+            if (mouseOnWindow)
                 Repaint();
         }
 
         #region Helper functions
 
-        private Vector3 PointToPlotCoords(float time, float value, MouseLocation plot)
+        private Vector3 PointToPlotCoords(float time, float value, float heightOffset = 0)
         {
             return new Vector3(time / this.time * plotScrollSize.x, 
-                plotScreenSize.y - value * plotScreenSize.y + (plot == MouseLocation.SharpnessPlot ? plotHeightOffset : 0), 0);
+                plotScreenSize.y - value * plotScreenSize.y + heightOffset);
         }
 
-        private ContinuousEvent GetContinuousEventIfBetween(float time)
+        private bool TryGetContinuousEventOnTime(float time, out ContinuousEvent continuousEvent)
         {
+            continuousEvent = null;
             foreach (var ev in events)
             {
-                if (ev.Time < time && ev is ContinuousEvent continuousEvent && 
-                    time > continuousEvent.Time && time < continuousEvent.IntensityCurve.Last().Time)
-                    return continuousEvent;
+                if (time > ev.Time && ev is ContinuousEvent ce && time < ce.IntensityCurve.Last().Time)
+                {
+                    continuousEvent = ce;
+                    return true;
+                }                    
             }
-            return null;
+            return false;
         }
 
         private EventPoint GetEventPointOnPosition(Vector2 plotPosition, MouseLocation plot, out VibrationEvent vibrationEvent)
@@ -740,9 +752,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             foreach (var ev in events)
             {
                 t = ev is TransientEvent ? ev.Time : ((ContinuousEvent)ev).IntensityCurve.Last().Time;
-
-                if (t > lastPointTime)
-                    lastPointTime = t;
+                t = Mathf.Max(t, lastPointTime);
             }
             return lastPointTime;
         }

@@ -51,14 +51,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (location != MouseLocation.Outside)
             {
                 Rect offsetRect = new(point - offset, offset * 2);
-                if (location == MouseLocation.IntensityPlot && offsetRect.Contains(Intensity))
+                var pointToTest = location == MouseLocation.IntensityPlot ? Intensity : Sharpness;
+                if (offsetRect.Contains(pointToTest))
                 {
-                    eventPoint = Intensity;
-                    return true;
-                }
-                else if (location == MouseLocation.SharpnessPlot && offsetRect.Contains(Sharpness))
-                {
-                    eventPoint = Sharpness;
+                    eventPoint = pointToTest;
                     return true;
                 }
             }
@@ -81,11 +77,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public ContinuousEvent() { }
 
-        public ContinuousEvent(Vector2 time, Vector2 intensity, Vector2 sharpness)
+        public ContinuousEvent(Vector2 startEndTimes, Vector2 intensity, Vector2 sharpness)
         {
-            Time = time.x;
-            IntensityCurve = new List<EventPoint>() { new EventPoint(time.x, intensity.x), new EventPoint(time.y, intensity.y) };
-            SharpnessCurve = new List<EventPoint>() { new EventPoint(time.x, sharpness.x), new EventPoint(time.y, sharpness.y) };
+            Time = startEndTimes.x;
+            IntensityCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, intensity.x), new EventPoint(startEndTimes.y, intensity.y) };
+            SharpnessCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, sharpness.x), new EventPoint(startEndTimes.y, sharpness.y) };
         }
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
@@ -129,35 +125,47 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             list.Add(new Pattern(e, null));
 
             // Parameter curves
-            var curve = new ParameterCurve(Time, AHAPFile.CURVE_INTENSITY);
-            foreach (var intensityPoint in IntensityCurve)
+            list.AddRange(CurveToPatterns(IntensityCurve, AHAPFile.CURVE_INTENSITY));
+            list.AddRange(CurveToPatterns(SharpnessCurve, AHAPFile.CURVE_SHARPNESS));
+
+            return list;
+        }
+
+        public void AddPointToCurve(EventPoint point, MouseLocation plot)
+        {
+            if (plot == MouseLocation.Outside)
             {
-                curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(intensityPoint.Time, intensityPoint.Value));
+                Debug.LogError("Wrong location!");
+                return;
+            }
+
+            var curve = plot == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
+            if (curve.Count < 2)
+            {
+                Debug.LogError("Invalid curve!");
+                return;
+            }
+
+            curve.Add(point);
+            curve.Sort((p1, p2) => p1.Time.CompareTo(p2.Time));
+        }
+
+        private List<Pattern> CurveToPatterns(List<EventPoint> pointsList, string curveName)
+        {
+            List<Pattern> list = new();
+            var curve = new ParameterCurve(Time, curveName);
+            foreach (var point in pointsList)
+            {
+                curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(point.Time, point.Value));
                 if (curve.ParameterCurveControlPoints.Count >= 16)
                 {
                     list.Add(new Pattern(null, curve));
-                    curve = new ParameterCurve(intensityPoint.Time, AHAPFile.CURVE_INTENSITY);
-                    curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(intensityPoint.Time, intensityPoint.Value));
+                    curve = new ParameterCurve(point.Time, curveName);
+                    curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(point.Time, point.Value));
                 }
             }
-            if (list.Count == 1 || (list.Count > 1 && curve.ParameterCurveControlPoints.Count > 1))
+            if (list.Count == 0 || (list.Count > 0 && curve.ParameterCurveControlPoints.Count > 1))
                 list.Add(new Pattern(null, curve));
-
-            int count = list.Count;
-            curve = new ParameterCurve(Time, AHAPFile.CURVE_SHARPNESS);
-            foreach (var sharpnessPoint in SharpnessCurve)
-            {
-                curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(sharpnessPoint.Time, sharpnessPoint.Value));
-                if (curve.ParameterCurveControlPoints.Count >= 16)
-                {
-                    list.Add(new Pattern(null, curve));
-                    curve = new ParameterCurve(sharpnessPoint.Time, AHAPFile.CURVE_SHARPNESS);
-                    curve.ParameterCurveControlPoints.Add(new ParameterCurveControlPoint(sharpnessPoint.Time, sharpnessPoint.Value));
-                }
-            }
-            if (list.Count == count || (list.Count > count && curve.ParameterCurveControlPoints.Count > 1))
-                list.Add(new Pattern(null, curve));
-
             return list;
         }
     }

@@ -65,6 +65,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale");
             public static GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project", "Name that will be save in project's metadata.");
             public static GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
+            public static GUIContent zoomLabel = EditorGUIUtility.TrTextContent("Zoom");
 
             public static GUIStyle plotTitleStyle = new(EditorStyles.boldLabel) { alignment = TextAnchor.UpperCenter };
             public static GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };
@@ -454,7 +455,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             EditorGUILayout.LabelField("Reference waveform", EditorStyles.boldLabel);
             GUILayout.BeginHorizontal();
             EditorGUI.BeginChangeCheck();
-            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false, GUILayout.MinWidth(topBarOptionsContainerWidth * 0.25f)) as AudioClip;
+            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false) as AudioClip;
             if (EditorGUI.EndChangeCheck())
             {
                 AudioClipUtils.StopAllClips();
@@ -463,10 +464,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUI.enabled = audioClip != null;
             if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), EditorStyles.iconButton))
                 AudioClipUtils.PlayClip(audioClip);
-            GUILayout.FlexibleSpace();
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
             EditorGUI.BeginChangeCheck();
-            audioWaveformVisible = EditorGUILayout.Toggle(Content.waveformVisibleLabel, audioWaveformVisible);
+            audioWaveformVisible = EditorGUILayout.Toggle(Content.waveformVisibleLabel, audioWaveformVisible, topBarContainerThirdOption);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (!audioWaveformVisible)
@@ -488,7 +488,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Reset zoom", topBarContainerThirdOption))
                 zoom = 1;
-            zoom = (float)Math.Round(EditorGUILayout.Slider("Zoom", zoom, 1, MAX_ZOOM), 1);
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+            zoom = (float)Math.Round(EditorGUILayout.Slider(Content.zoomLabel, zoom, 1, MAX_ZOOM), 1);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Clear", topBarContainerThirdOption))

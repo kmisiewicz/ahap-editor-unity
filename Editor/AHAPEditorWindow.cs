@@ -163,11 +163,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
             Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineDoubleSpacing, topBarRect.width, bottomPartHeight);
 
-            float plotAreaWidth = bottomPartRect.width * 1f;
+            float plotAreaWidth = bottomPartRect.width * 0.85f;
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
 
-            float pointEditAreaWidth = Mathf.Max(bottomPartRect.width - plotAreaWidth - lineHalfHeight, 0);
-            Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineHalfHeight, 0),
+            float pointEditAreaWidth = Mathf.Max(bottomPartRect.width - plotAreaWidth - lineDoubleSpacing, 0);
+            Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineDoubleSpacing, 0),
                 new Vector2(pointEditAreaWidth, bottomPartHeight));
 
             float singlePlotAreaHeight = (plotAreaRect.height - lineHeight) * 0.5f - lineSpacing;
@@ -705,7 +705,41 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             #endregion
-                        
+
+            #region Draw Side Panel
+
+            GUILayout.BeginArea(pointEditAreaRect, EditorStyles.helpBox);
+            GUILayout.BeginVertical();
+
+
+            GUILayout.FlexibleSpace();
+
+            // Hover info
+            GUILayout.BeginVertical(GUI.skin.box);
+            EditorGUILayout.LabelField("Hover info", EditorStyles.boldLabel);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Plot");
+            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : mouseLocation.ToString(), Content.yAxisLabelStyle);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Time");
+            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.x.ToString(), Content.yAxisLabelStyle);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Value");
+            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.y.ToString(), Content.yAxisLabelStyle);
+            GUILayout.EndHorizontal();
+
+            GUILayout.EndVertical();
+
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+
+            #endregion
+
             if (mouseOnWindow)
                 Repaint();
         }

@@ -24,7 +24,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
     internal abstract class VibrationEvent
     {
-        public float Time;
+        public abstract float Time { get; }
 
         public abstract bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint);
 
@@ -40,10 +40,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public TransientEvent(float time, float intensity, float sharpness)
         {
-            Time = time;
             Intensity = new EventPoint(time, intensity);
             Sharpness = new EventPoint(time, sharpness);
         }
+
+        public override float Time => Intensity?.Time ?? 0;
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {
@@ -79,10 +80,21 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public ContinuousEvent(Vector2 startEndTimes, Vector2 intensity, Vector2 sharpness)
         {
-            Time = startEndTimes.x;
             IntensityCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, intensity.x), new EventPoint(startEndTimes.y, intensity.y) };
             SharpnessCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, sharpness.x), new EventPoint(startEndTimes.y, sharpness.y) };
         }
+
+        public ContinuousEvent(Vector2 firstPoint, Vector2 secondPoint, MouseLocation plot)
+        {
+            if (firstPoint.x > secondPoint.x)
+                (firstPoint, secondPoint) = (secondPoint, firstPoint);
+            List<EventPoint> specCurve = new() { new EventPoint(firstPoint.x, firstPoint.y), new EventPoint(secondPoint.x, secondPoint.y) };
+            List<EventPoint> defaultCurve = new() { new EventPoint(firstPoint.x, 0.5f), new EventPoint(secondPoint.x, 0.5f) };
+            IntensityCurve = plot == MouseLocation.IntensityPlot ? specCurve : defaultCurve;
+            SharpnessCurve = plot == MouseLocation.SharpnessPlot ? specCurve : defaultCurve;
+        }
+
+        public override float Time => IntensityCurve?.FirstOrDefault()?.Time ?? 0;
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {

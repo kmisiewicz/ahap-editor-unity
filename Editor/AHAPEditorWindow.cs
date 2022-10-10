@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    public class AHAPEditorWindow : EditorWindow
+    public class AHAPEditorWindow : EditorWindow, IHasCustomMenu
     {
         #region Types, defines and variables
 
@@ -109,11 +109,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         float lastAudioClipPaintedZoom = 1f;
         bool normalizeWaveform;
         float renderScale = 1f;
-        
-		// Debug
+
+        // Debug
+        bool debugMode;
         bool drawRects;
 
         #endregion
+
+        bool DebugMode
+        {
+            get => debugMode;
+            set
+            {
+                debugMode = value;
+                if (!debugMode)
+                    drawRects = false;
+            }
+        }
 
         [MenuItem("Window/AHAP Editor")]
         public static void OpenWindow()
@@ -122,6 +134,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var content = EditorGUIUtility.IconContent("d_HoloLensInputModule Icon", "AHAP Editor");
             content.text = "AHAP Editor";
             window.titleContent = content;
+        }
+
+        public void AddItemsToMenu(GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Debug Mode"), DebugMode, () => DebugMode = !DebugMode);
         }
 
         private void OnEnable()
@@ -134,7 +151,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             audioWaveformVisible = normalizeWaveform = shouldRepaintWaveform = false;
             pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)
-                pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? " " + x : x.ToString())).TrimStart(' ');
+                pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? $" {x}" : x.ToString())).TrimStart(' ');
+            DebugMode = false;
         }
 
         private void Clear()
@@ -411,28 +429,31 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginHorizontal();
 
             // GUI Debug
-            //GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
-            //EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
-            //if (GUILayout.Button("Log rects", topBarContainerThirdOption))
-            //{
-            //    StringBuilder sb = new("Rects:\n");
-            //    sb.AppendLine($"Top bar: {topBarRect} (blue)");
-            //    sb.AppendLine($"Bottom part: {bottomPartRect} (black)");
-            //    sb.AppendLine($"Plot area: {plotAreaRect} (yellow)");
-            //    sb.AppendLine($"Point edit area: {pointEditAreaRect} (green)");
-            //    sb.AppendLine($"Intensity area: {intensityPlotAreaRect} (magenta)");
-            //    sb.AppendLine($"Intensity plot: {intensityPlotRect} (red)");
-            //    sb.AppendLine($"Sharpness area: {sharpnessPlotAreaRect} (cyan)");
-            //    sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
-            //    sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
-            //    sb.AppendLine($"Scroll rect: {yAxisLabelRect} (white)");
-            //    sb.AppendLine($"Scroll rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
-            //    Debug.Log(sb.ToString());
-            //}
-            //GUIContent drawRectsLabel = new("Draw Rects");
-            //EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            //drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
-            //GUILayout.EndVertical();
+            if (debugMode)
+            {
+                GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
+                EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
+                if (GUILayout.Button("Log rects", topBarContainerThirdOption))
+                {
+                    StringBuilder sb = new("Rects:\n");
+                    sb.AppendLine($"Top bar: {topBarRect} (blue)");
+                    sb.AppendLine($"Bottom part: {bottomPartRect} (black)");
+                    sb.AppendLine($"Plot area: {plotAreaRect} (yellow)");
+                    sb.AppendLine($"Point edit area: {pointEditAreaRect} (green)");
+                    sb.AppendLine($"Intensity area: {intensityPlotAreaRect} (magenta)");
+                    sb.AppendLine($"Intensity plot: {intensityPlotRect} (red)");
+                    sb.AppendLine($"Sharpness area: {sharpnessPlotAreaRect} (cyan)");
+                    sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
+                    sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
+                    sb.AppendLine($"Y axis label rect: {yAxisLabelRect} (white)");
+                    sb.AppendLine($"X axis label rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
+                    Debug.Log(sb.ToString());
+                }
+                GUIContent drawRectsLabel = new("Draw Rects");
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
+                GUILayout.EndVertical();
+            }
 
             // File
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);

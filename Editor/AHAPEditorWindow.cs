@@ -660,15 +660,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (mouseLocation != MouseLocation.Outside)
             {
                 // Hover helper lines
+                Vector3 windowMousePositionProcessed = PointToWindowCoords(plotPosition, mousePlotRect);
                 Handles.color = COLOR_HOVER_GUIDES;
-                Handles.DrawLine(new Vector3(currentEvent.mousePosition.x, otherPlotRect.y),
-                    new Vector3(currentEvent.mousePosition.x, otherPlotRect.y + otherPlotRect.height));
-                Handles.DrawLine(new Vector3(currentEvent.mousePosition.x, mousePlotRect.y),
-                    new Vector3(currentEvent.mousePosition.x, mousePlotRect.y + mousePlotRect.height));
-                Handles.DrawLine(new Vector3(mousePlotRect.x, currentEvent.mousePosition.y),
-                    new Vector3(mousePlotRect.x + mousePlotRect.width, currentEvent.mousePosition.y));
-                Handles.DrawSolidDisc(new Vector3(currentEvent.mousePosition.x, currentEvent.mousePosition.y),
-                    POINT_NORMAL, HOVER_DOT_SIZE);
+                Handles.DrawLine(new Vector3(windowMousePositionProcessed.x, otherPlotRect.y),
+                    new Vector3(windowMousePositionProcessed.x, otherPlotRect.y + otherPlotRect.height));
+                Handles.DrawLine(new Vector3(windowMousePositionProcessed.x, mousePlotRect.y),
+                    new Vector3(windowMousePositionProcessed.x, mousePlotRect.y + mousePlotRect.height));
+                Handles.DrawLine(new Vector3(mousePlotRect.x, windowMousePositionProcessed.y),
+                    new Vector3(mousePlotRect.x + mousePlotRect.width, windowMousePositionProcessed.y));
+                Handles.DrawSolidDisc(windowMousePositionProcessed, POINT_NORMAL, HOVER_DOT_SIZE);
 
                 // Continuous event creation
                 if (draggedPoint == null && currentEvent.button == (int)MouseButton.Left && previousMouseState == EventType.MouseDrag && mouseLocation == mouseClickLocation)
@@ -686,7 +686,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
             }
 
-            // Drag and hover point highlight
+            // Highlighted points
             EventPoint highlightedPoint = null;
             float highlightSize = 0f;
             Rect highlightRect = mousePlotRect;
@@ -705,8 +705,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
             if (highlightedPoint != null)
             {
-                Vector3 highlightedPointCoords = new(highlightRect.x + highlightedPoint.Time / time * plotScrollSize.x - scrollPosition.x,
-                    highlightRect.y + highlightRect.height - highlightedPoint.Value * highlightRect.height);
+                Vector3 highlightedPointCoords = PointToWindowCoords(highlightedPoint, highlightRect);
                 Handles.DrawSolidDisc(highlightedPointCoords, POINT_NORMAL, highlightSize);
             }
 
@@ -771,6 +770,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             return new Vector3(time / this.time * plotScrollSize.x, 
                 plotScreenSize.y - value * plotScreenSize.y + heightOffset);
+        }
+
+        private Vector3 PointToWindowCoords(EventPoint point, Rect plotRect)
+        {
+            return new Vector3(plotRect.x + point.Time / this.time * plotScrollSize.x - scrollPosition.x,
+                plotRect.y + plotRect.height - point.Value * plotRect.height);
         }
 
         private bool TryGetContinuousEventOnTime(float time, out ContinuousEvent continuousEvent)

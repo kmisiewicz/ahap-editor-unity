@@ -69,6 +69,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
             public static GUIContent zoomLabel = EditorGUIUtility.TrTextContent("Zoom");
             
+            public static GUIContent drawRectsLabel = EditorGUIUtility.TrTextContent("Draw Rects");
             public static GUIContent yAxisLabelDummy = EditorGUIUtility.TrTextContent("#.##");
             public static GUIContent xAxisLabelDummy = EditorGUIUtility.TrTextContent("##.###");
         }
@@ -462,9 +463,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     sb.AppendLine($"X axis label rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
                     Debug.Log(sb.ToString());
                 }
-                GUIContent drawRectsLabel = new("Draw Rects");
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-                drawRects = EditorGUILayout.Toggle(drawRectsLabel, drawRects, topBarContainerThirdOption);
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                drawRects = EditorGUILayout.Toggle(Content.drawRectsLabel, drawRects, topBarContainerThirdOption);
                 GUILayout.EndVertical();
             }
 
@@ -496,7 +496,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 audioWaveformVisible = false;
             }
             GUI.enabled = audioClip != null;
-            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), EditorStyles.iconButton))
+            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), GUILayout.MaxWidth(25)))
                 AudioClipUtils.PlayClip(audioClip);
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
             EditorGUI.BeginChangeCheck();

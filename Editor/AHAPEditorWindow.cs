@@ -530,6 +530,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 Clear();
             EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
             time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, time), GetLastPointTime()), MIN_TIME, MAX_TIME);
+            if (audioClip != null)
+                time = Mathf.Max(time, audioClip.length);
             EditorGUIUtility.labelWidth = 0;
             GUILayout.EndHorizontal();
             GUILayout.EndVertical();
@@ -591,10 +593,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     lastAudioClipPaintedZoom = zoom;
                     shouldRepaintWaveform = false;
                 }
-                GUI.DrawTexture(scrollPlotRect, audioClipTexture, ScaleMode.StretchToFill);
-                scrollPlotRect.y += plotHeightOffset;
-                GUI.DrawTexture(scrollPlotRect, audioClipTexture, ScaleMode.StretchToFill);
-                scrollPlotRect.y -= plotHeightOffset;
+                Rect audioTextureRect = new(scrollPlotRect);
+                audioTextureRect.width *= audioClip.length / time;
+                GUI.DrawTexture(audioTextureRect, audioClipTexture, ScaleMode.StretchToFill);
+                audioTextureRect.y += plotHeightOffset;
+                GUI.DrawTexture(audioTextureRect, audioClipTexture, ScaleMode.StretchToFill);
             }
 
             // X axis labels and vertical grid

@@ -15,27 +15,21 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float[] waveform = new float[width];
             audio.GetData(samples, 0);
             int packSize = (samples.Length / width) + 1;
-            float maxValue = 0;
             for (int i = 0, s = 0; i < samples.Length; i += packSize, s++)
-            {
                 waveform[s] = Mathf.Abs(samples[i]);
-                maxValue = Mathf.Max(maxValue, waveform[s]);
-            }
             if (normalize)
+            {
+                float maxValue = waveform.Max();
                 for (int x = 0; x < width; x++)
                     waveform[x] /= maxValue;
+            }
 
             // Paint waveform
             Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
-            texture.SetPixels(Enumerable.Repeat(Color.clear, width * height).ToArray());
+            texture.SetPixels(Enumerable.Repeat(backgroundColor, width * height).ToArray());
             for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y <= waveform[x] * (height * 0.5f); y++)
-                {
-                    texture.SetPixel(x, (height / 2) + y, waveformColor);
-                    texture.SetPixel(x, (height / 2) - y, waveformColor);
-                }
-            }
+                for (int y = 0; y <= waveform[x] * height; y++)
+                    texture.SetPixel(x, y, waveformColor);
             texture.Apply();
 
             return texture;
@@ -46,7 +40,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static void PlayClip(AudioClip clip, int startSample = 0, bool loop = false)
         {
             Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
-
             Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
             MethodInfo method = audioUtilClass.GetMethod(
                 "PlayPreviewClip",
@@ -62,7 +55,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static void StopAllClips()
         {
             Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
-
             Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
             MethodInfo method = audioUtilClass.GetMethod(
                 "StopAllPreviewClips",

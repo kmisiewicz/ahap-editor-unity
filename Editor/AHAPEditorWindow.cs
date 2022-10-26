@@ -43,6 +43,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float MIN_WAVEFORM_RENDER_SCALE = 0.1f;
         const float MAX_WAVEFORM_RENDER_SCALE = 2f;
         const float CUSTOM_LABEL_WIDTH_OFFSET = 3;
+        const float PLOT_AREA_BASE_WIDTH = 0.85f;
+        const float PLOT_AREA_MIN_WIDTH = 0.5f;
+        const float PLOT_AREA_MAX_WIDTH = 0.9f;
 
         static readonly Vector3 POINT_NORMAL = new(0, 0, 1);
         static readonly Vector2 MARGIN = new(3, 2);
@@ -108,6 +111,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         string[] pointDragModes;
         PointDragMode pointDragMode = PointDragMode.FreeMove;
         SnapMode snapMode = SnapMode.None;
+        bool pointEditAreaVisible; // change to false
+        float plotAreaWidthFactor;
+        bool pointEditAreaResize;
                 
         // Audio waveform
         AudioClip audioClip;
@@ -160,6 +166,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)
                 pointDragModes[i] = string.Concat(pointDragModes[i].Select(x => char.IsUpper(x) ? $" {x}" : x.ToString())).TrimStart(' ');
+            plotAreaWidthFactor = PLOT_AREA_BASE_WIDTH;
+            pointEditAreaVisible = false;
+
             DebugMode = false;
         }
 
@@ -191,12 +200,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float bottomPartHeight = position.height - MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
             Rect bottomPartRect = new(MARGIN.x, MARGIN.y + topBarHeight + lineDoubleSpacing, topBarRect.width, bottomPartHeight);
 
-            float plotAreaWidth = bottomPartRect.width * 0.85f;
+            float plotAreaWidth = bottomPartRect.width * (pointEditAreaVisible ? plotAreaWidthFactor : 1);
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
 
             float pointEditAreaWidth = Mathf.Max(bottomPartRect.width - plotAreaWidth - lineDoubleSpacing, 0);
             Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineDoubleSpacing, 0),
                 new Vector2(pointEditAreaWidth, bottomPartHeight));
+
+            Rect resizeBarRect = new(plotAreaRect.xMax, plotAreaRect.y + PLOT_BORDER_WIDTH,
+                lineDoubleSpacing * 2f, plotAreaRect.height - 2 * PLOT_BORDER_WIDTH);
 
             float singlePlotAreaHeight = (plotAreaRect.height - lineHeight) * 0.5f - lineSpacing;
             Rect intensityPlotAreaRect = new(plotAreaRect.position, new Vector2(plotAreaWidth, singlePlotAreaHeight));
@@ -252,8 +264,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 EditorGUI.DrawRect(intensityPlotRect, Color.red);
                 EditorGUI.DrawRect(sharpnessPlotRect, Color.blue);
                 EditorGUI.DrawRect(scrollRect, new Color(1, 1, 1, 0.6f));
-                EditorGUI.DrawRect(yAxisLabelRect, Color.white);
+                EditorGUI.DrawRect(yAxisLabelRect, Color.white);                
                 EditorGUI.DrawRect(new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size), Color.white);
+                EditorGUI.DrawRect(resizeBarRect, Color.white);
             }
 
             #endregion
@@ -433,6 +446,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     hoverPoint = null;
                     hoverPointEvent = null;
                 }
+                pointEditAreaResize = false;
+            }
+            if (pointEditAreaVisible)
+            {
+                if (!pointEditAreaResize && resizeBarRect.Contains(currentEvent.mousePosition))
+                {
+                    EditorGUIUtility.AddCursorRect(resizeBarRect, MouseCursor.ResizeHorizontal);
+                    if (currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseDown)
+                        pointEditAreaResize = true;
+                }
+
+                if (pointEditAreaResize/* && currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseDrag*/)
+                {
+                    EditorGUIUtility.AddCursorRect(new Rect(Vector2.zero, position.size), MouseCursor.ResizeHorizontal);
+                    plotAreaWidthFactor = Mathf.Clamp(currentEvent.mousePosition.x / bottomPartRect.width, PLOT_AREA_MIN_WIDTH, PLOT_AREA_MAX_WIDTH);
+                }
             }
             
             #endregion
@@ -461,6 +490,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
                     sb.AppendLine($"Y axis label rect: {yAxisLabelRect} (white)");
                     sb.AppendLine($"X axis label rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
+                    sb.AppendLine($"Resize bar: {resizeBarRect} (white)");
                     Debug.Log(sb.ToString());
                 }
                 EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
@@ -538,8 +568,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             // Point editing
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);            
-            pointDragMode = (PointDragMode)GUILayout.SelectionGrid((int)pointDragMode, pointDragModes, pointDragModes.Length);
+            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
+            //pointDragMode = (PointDragMode)GUILayout.Toolbar((int)pointDragMode, pointDragModes);
+            pointEditAreaVisible = EditorGUILayout.Toggle("Advanced panel", pointEditAreaVisible);
             snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
             GUILayout.EndVertical();
 
@@ -753,76 +784,78 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #region Draw Side Panel
 
-            GUILayout.BeginArea(pointEditAreaRect, EditorStyles.helpBox);
-            GUILayout.BeginVertical();
-
-            // Selected point
-            GUILayout.BeginVertical(GUI.skin.box);
-            EditorGUILayout.LabelField("Selected point", EditorStyles.boldLabel);
-            if (selectedPoints.Count == 1 && selectedPoints[0] != null)
+            if (pointEditAreaVisible)
             {
-                var point = selectedPoints[0];
-                EditorGUI.BeginChangeCheck();
-                float newTime = Mathf.Clamp(EditorGUILayout.FloatField("Time", point.Time), dragMin, dragMax);
-                if (EditorGUI.EndChangeCheck())
+                GUILayout.BeginArea(pointEditAreaRect, EditorStyles.helpBox);
+                GUILayout.BeginVertical();
+
+                // Selected point
+                GUILayout.BeginVertical(GUI.skin.box);
+                EditorGUILayout.LabelField("Selected point", EditorStyles.boldLabel);
+                if (selectedPoints.Count == 1 && selectedPoints[0] != null)
                 {
-                    GetEventPointOnPosition(point, selectedPointLocation, out VibrationEvent vibrationEvent);
-                    if (vibrationEvent is TransientEvent transientEvent)
+                    var point = selectedPoints[0];
+                    EditorGUI.BeginChangeCheck();
+                    float newTime = Mathf.Clamp(EditorGUILayout.FloatField("Time", point.Time), dragMin, dragMax);
+                    if (EditorGUI.EndChangeCheck())
                     {
-                        transientEvent.Sharpness.Time = transientEvent.Intensity.Time = newTime;
+                        GetEventPointOnPosition(point, selectedPointLocation, out VibrationEvent vibrationEvent);
+                        if (vibrationEvent is TransientEvent transientEvent)
+                        {
+                            transientEvent.Sharpness.Time = transientEvent.Intensity.Time = newTime;
+                        }
+                        else if (vibrationEvent is ContinuousEvent continuousEvent)
+                        {
+                            if (point.Time == continuousEvent.IntensityCurve.First().Time || point.Time == continuousEvent.SharpnessCurve.First().Time)
+                                continuousEvent.IntensityCurve.First().Time = continuousEvent.SharpnessCurve.First().Time = newTime;
+                            else if (point.Time == continuousEvent.IntensityCurve.Last().Time || point.Time == continuousEvent.SharpnessCurve.Last().Time)
+                                continuousEvent.IntensityCurve.Last().Time = continuousEvent.SharpnessCurve.Last().Time = newTime;
+                            else
+                                point.Time = newTime;
+                        }
                     }
-                    else if (vibrationEvent is ContinuousEvent continuousEvent)
-                    {
-                        if (point.Time == continuousEvent.IntensityCurve.First().Time || point.Time == continuousEvent.SharpnessCurve.First().Time)
-                            continuousEvent.IntensityCurve.First().Time = continuousEvent.SharpnessCurve.First().Time = newTime;
-                        else if (point.Time == continuousEvent.IntensityCurve.Last().Time || point.Time == continuousEvent.SharpnessCurve.Last().Time)
-                            continuousEvent.IntensityCurve.Last().Time = continuousEvent.SharpnessCurve.Last().Time = newTime;
-                        else
-                            point.Time = newTime;
-                    }
-                    
+                    string parameter = selectedPointLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness";
+                    point.Value = Mathf.Clamp01(EditorGUILayout.FloatField(parameter, point.Value));
                 }
-                string parameter = selectedPointLocation == MouseLocation.IntensityPlot ? "Intensity" : "Sharpness";
-                point.Value = Mathf.Clamp01(EditorGUILayout.FloatField(parameter, point.Value));
+                else if (selectedPoints.Count > 1)
+                {
+                    EditorGUILayout.LabelField("Multiple points", Styles.xAxisLabelStyle);
+                    EditorGUILayout.LabelField("selected", Styles.xAxisLabelStyle);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No", Styles.xAxisLabelStyle);
+                    EditorGUILayout.LabelField("selection", Styles.xAxisLabelStyle);
+                }
+                GUILayout.Space(3);
+                GUILayout.EndVertical();
+
+                GUILayout.FlexibleSpace();
+
+                // Hover info
+                GUILayout.BeginVertical(GUI.skin.box);
+                EditorGUILayout.LabelField("Hover info", EditorStyles.boldLabel);
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Plot");
+                GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : mouseLocation.ToString(), Styles.yAxisLabelStyle);
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Time");
+                GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.x.ToString(), Styles.yAxisLabelStyle);
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Value");
+                GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.y.ToString(), Styles.yAxisLabelStyle);
+                GUILayout.EndHorizontal();
+
+                GUILayout.EndVertical();
+
+                GUILayout.EndVertical();
+                GUILayout.EndArea();
             }
-            else if (selectedPoints.Count > 1)
-            {
-                EditorGUILayout.LabelField("Multiple points", Styles.xAxisLabelStyle);
-                EditorGUILayout.LabelField("selected", Styles.xAxisLabelStyle);
-            }
-            else
-            {
-                EditorGUILayout.LabelField("No", Styles.xAxisLabelStyle);
-                EditorGUILayout.LabelField("selection", Styles.xAxisLabelStyle);
-            }
-            GUILayout.Space(3);
-            GUILayout.EndVertical();
-
-            GUILayout.FlexibleSpace();
-
-            // Hover info
-            GUILayout.BeginVertical(GUI.skin.box);
-            EditorGUILayout.LabelField("Hover info", EditorStyles.boldLabel);
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Plot");
-            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : mouseLocation.ToString(), Styles.yAxisLabelStyle);
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Time");
-            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.x.ToString(), Styles.yAxisLabelStyle);
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Value");
-            GUILayout.Label(mouseLocation == MouseLocation.Outside ? "-" : plotPosition.y.ToString(), Styles.yAxisLabelStyle);
-            GUILayout.EndHorizontal();
-
-            GUILayout.EndVertical();
-
-            GUILayout.EndVertical();
-            GUILayout.EndArea();
 
             #endregion
 
@@ -952,14 +985,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             {
                                 List<EventPoint> intensityPoints = new();
                                 float t = (float)e.Time;
-                                Pattern curve = FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t);
+                                Pattern curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
                                         intensityPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
 
                                     t = intensityPoints.Last().Time;
-                                    curve = FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
+                                    curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
                                 }
                                 if (intensityPoints.Count == 0)
                                 {
@@ -973,14 +1006,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                                 List<EventPoint> sharpnessPoints = new();
                                 t = (float)e.Time;
-                                curve = FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t);
+                                curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
                                         sharpnessPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
 
                                     t = sharpnessPoints.Last().Time;
-                                    curve = FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
+                                    curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
                                 }
                                 if (sharpnessPoints.Count == 0)
                                 {
@@ -1007,12 +1040,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 catch (Exception ex)
                 {
                     Debug.LogError($"Error while importing file {ahapFile.name}{Environment.NewLine}{ex.Message}");
-                }
-
-                Pattern FindCurveOnTime(string curveType, float time, Pattern previousCurve = null)
-                {
-                    return ahap.Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == time &&
-                        element.ParameterCurve.ParameterID == curveType && element != previousCurve);
                 }
             }
         }

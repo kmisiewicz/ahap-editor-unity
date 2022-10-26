@@ -125,5 +125,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Metadata = metadata;
             Pattern = pattern;
         }
+
+        public Pattern FindCurveOnTime(string curveType, float time, Pattern previousCurve = null)
+        {
+            return Pattern.Find(element => element.ParameterCurve != null && (float)element.ParameterCurve.Time == time &&
+                element.ParameterCurve.ParameterID == curveType && element != previousCurve);
+        }
     }
 }

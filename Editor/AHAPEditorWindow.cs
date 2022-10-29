@@ -359,7 +359,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             }
                             else if (previousMouseState == EventType.MouseDrag && !TryGetContinuousEventOnTime(plotPosition.x, out _))
                             {
-                                events.Add(new ContinuousEvent(mouseClickPlotPosition, plotPosition, mouseLocation));
+                                Vector2 endPoint = currentEvent.shift ? new Vector2(plotPosition.x, mouseClickPlotPosition.y) : plotPosition;
+                                events.Add(new ContinuousEvent(mouseClickPlotPosition, endPoint, mouseLocation));
                             }
                             previousMouseState = EventType.MouseUp;
                         }
@@ -449,6 +450,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 pointEditAreaResize = false;
             }
+
+            // Handle point edit area resizing
             if (pointEditAreaVisible)
             {
                 if (!pointEditAreaResize && resizeBarRect.Contains(currentEvent.mousePosition))
@@ -461,7 +464,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     }
                 }
 
-                if (pointEditAreaResize/* && currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseDrag*/)
+                if (pointEditAreaResize)
                 {
                     EditorGUIUtility.AddCursorRect(new Rect(Vector2.zero, position.size), MouseCursor.ResizeHorizontal);
                     plotAreaWidthFactor = Mathf.Clamp((currentEvent.mousePosition.x + plotAreaWidthFactorOffset) / bottomPartRect.width,
@@ -726,7 +729,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (draggedPoint == null && currentEvent.button == (int)MouseButton.Left && previousMouseState == EventType.MouseDrag && mouseLocation == mouseClickLocation)
                 {
                     Vector3 leftPoint = mouseClickPosition;
-                    Vector3 rightPoint = windowMousePositionProcessed;
+                    Vector3 rightPoint = currentEvent.shift ? new Vector3(windowMousePositionProcessed.x, mouseClickPosition.y) : windowMousePositionProcessed;
                     if (leftPoint.x > rightPoint.x)
                         (leftPoint, rightPoint) = (rightPoint, leftPoint);
                     Handles.color = COLOR_EVENT_CONTINUOUS_CREATION;

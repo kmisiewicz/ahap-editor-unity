@@ -402,9 +402,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     {
                         if (currentEvent.type == EventType.MouseDrag && mouseLocation == mouseClickLocation) // Handle dragging
                         {
-                            if (pointDragMode != PointDragMode.LockTime && !currentEvent.shift)
+                            if (pointDragMode != PointDragMode.LockTime && !currentEvent.alt)
                                 draggedPoint.Time = Mathf.Clamp(plotPosition.x, dragMin, dragMax);
-                            if (pointDragMode != PointDragMode.LockValue && !currentEvent.alt)
+                            if (pointDragMode != PointDragMode.LockValue && !currentEvent.shift)
                                 draggedPoint.Value = Mathf.Clamp(plotPosition.y, 0, 1);
                             if (draggedPointEvent is TransientEvent te)
                             {

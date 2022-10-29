@@ -113,6 +113,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         SnapMode snapMode = SnapMode.None;
         bool pointEditAreaVisible; // change to false
         float plotAreaWidthFactor;
+        float plotAreaWidthFactorOffset;
         bool pointEditAreaResize;
                 
         // Audio waveform
@@ -454,13 +455,17 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     EditorGUIUtility.AddCursorRect(resizeBarRect, MouseCursor.ResizeHorizontal);
                     if (currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseDown)
+                    {
                         pointEditAreaResize = true;
+                        plotAreaWidthFactorOffset = plotAreaWidthFactor * bottomPartRect.width - currentEvent.mousePosition.x;
+                    }
                 }
 
                 if (pointEditAreaResize/* && currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseDrag*/)
                 {
                     EditorGUIUtility.AddCursorRect(new Rect(Vector2.zero, position.size), MouseCursor.ResizeHorizontal);
-                    plotAreaWidthFactor = Mathf.Clamp(currentEvent.mousePosition.x / bottomPartRect.width, PLOT_AREA_MIN_WIDTH, PLOT_AREA_MAX_WIDTH);
+                    plotAreaWidthFactor = Mathf.Clamp((currentEvent.mousePosition.x + plotAreaWidthFactorOffset) / bottomPartRect.width,
+                        PLOT_AREA_MIN_WIDTH, PLOT_AREA_MAX_WIDTH);
                 }
             }
             

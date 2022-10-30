@@ -38,13 +38,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public EventPoint Intensity;
         public EventPoint Sharpness;
 
+        public override float Time => Intensity?.Time ?? 0;
+
         public TransientEvent(float time, float intensity, float sharpness)
         {
             Intensity = new EventPoint(time, intensity);
             Sharpness = new EventPoint(time, sharpness);
         }
 
-        public override float Time => Intensity?.Time ?? 0;
+        public TransientEvent(EventPoint point, MouseLocation plot)
+        {
+            Intensity = plot == MouseLocation.IntensityPlot ? point : new EventPoint(point.Time, 0.5f);
+            Sharpness = plot == MouseLocation.SharpnessPlot ? point : new EventPoint(point.Time, 0.5f);
+        }
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {

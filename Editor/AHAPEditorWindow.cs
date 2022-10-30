@@ -53,38 +53,37 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         class Colors
         {
-            public static Color plotBorder = Color.white;
-            public static Color plotGrid = Color.gray;
-            public static Color waveform = new(0.42f, 1f, 0f, 0.2f);
-            public static Color waveformBg = Color.clear;
-            public static Color eventTransient = new(0.22f, 0.6f, 1f);
-            public static Color eventContinuous = new(1f, 0.6f, 0.2f);
-            public static Color eventContinuousCreation = new(1f, 0.6f, 0.2f, 0.5f);
-            public static Color hoverPoint = new(0.8f, 0.8f, 0.8f, 0.2f);
-            public static Color draggedPoint = new(0.7f, 1f, 1f, 0.3f);
-            public static Color selectedPoint = new(1f, 1f, 0f, 0.3f);
-            public static Color hoverGuides = new(0.7f, 0f, 0f);
+            public static readonly Color plotBorder = Color.white;
+            public static readonly Color plotGrid = Color.gray;
+            public static readonly Color waveform = new(0.42f, 1f, 0f, 0.2f);
+            public static readonly Color waveformBg = Color.clear;
+            public static readonly Color eventTransient = new(0.22f, 0.6f, 1f);
+            public static readonly Color eventContinuous = new(1f, 0.6f, 0.2f);
+            public static readonly Color eventContinuousCreation = new(1f, 0.6f, 0.2f, 0.5f);
+            public static readonly Color hoverPoint = new(0.8f, 0.8f, 0.8f, 0.2f);
+            public static readonly Color draggedPoint = new(0.7f, 1f, 1f, 0.3f);
+            public static readonly Color selectedPoint = new(1f, 1f, 0f, 0.3f);
+            public static readonly Color hoverGuides = new(0.7f, 0f, 0f);
         }
 
         class Content
         {
-            public static GUIContent waveformVisibleLabel = EditorGUIUtility.TrTextContent("Visible");
-            public static GUIContent normalizeLabel = EditorGUIUtility.TrTextContent("Normalize");
-            public static GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale");
-            public static GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project", "Name that will be save in project's metadata.");
-            public static GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
-            public static GUIContent zoomLabel = EditorGUIUtility.TrTextContent("Zoom");
-            
-            public static GUIContent drawRectsLabel = EditorGUIUtility.TrTextContent("Draw Rects");
-            public static GUIContent yAxisLabelDummy = EditorGUIUtility.TrTextContent("#.##");
-            public static GUIContent xAxisLabelDummy = EditorGUIUtility.TrTextContent("##.###");
+            public static readonly GUIContent waveformVisibleLabel = EditorGUIUtility.TrTextContent("Visible");
+            public static readonly GUIContent normalizeLabel = EditorGUIUtility.TrTextContent("Normalize");
+            public static readonly GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale");
+            public static readonly GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project", "Name that will be save in project's metadata.");
+            public static readonly GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
+            public static readonly GUIContent zoomLabel = EditorGUIUtility.TrTextContent("Zoom");
+            public static readonly GUIContent drawRectsLabel = EditorGUIUtility.TrTextContent("Draw Rects");
+            public static readonly GUIContent yAxisLabelDummy = EditorGUIUtility.TrTextContent("#.##");
+            public static readonly GUIContent xAxisLabelDummy = EditorGUIUtility.TrTextContent("##.###");
         }
 
         class Styles
         {
-            public static GUIStyle plotTitleStyle = new(EditorStyles.boldLabel) { alignment = TextAnchor.UpperCenter };
-            public static GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };
-            public static GUIStyle xAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
+            public static readonly GUIStyle plotTitleStyle = new(EditorStyles.boldLabel) { alignment = TextAnchor.UpperCenter };
+            public static readonly GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };
+            public static readonly GUIStyle xAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
         }
 
         // Data
@@ -95,42 +94,29 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         // Drawing
         float zoom = 1f;
-        Vector2 plotScreenSize; // Size of single plot rect on screen
-        Vector2 plotScrollSize; // Size of scroll view
-        Vector2 scrollPosition;
+        Vector2 plotScreenSize, plotScrollSize, scrollPosition;
         float plotHeightOffset; // Difference between plots top left corner
         EventType previousMouseState = EventType.MouseUp;
-        MouseLocation mouseLocation = MouseLocation.Outside;
-        MouseLocation mouseClickLocation = MouseLocation.Outside;
-        Vector2 mouseClickPosition;
-        Vector2 mouseClickPlotPosition;
-        EventPoint hoverPoint;
-        VibrationEvent hoverPointEvent;
-        EventPoint draggedPoint;
-        VibrationEvent draggedPointEvent;
+        MouseLocation mouseLocation, mouseClickLocation, selectedPointLocation;
+        Vector2 mouseClickPosition, mouseClickPlotPosition;
+        EventPoint hoverPoint, draggedPoint;
+        VibrationEvent hoverPointEvent, draggedPointEvent;
         List<EventPoint> selectedPoints;
-        MouseLocation selectedPointLocation = MouseLocation.Outside;
         float dragMin, dragMax;
         string[] pointDragModes;
         PointDragMode pointDragMode = PointDragMode.FreeMove;
         SnapMode snapMode = SnapMode.None;
-        bool pointEditAreaVisible; // change to false
-        float plotAreaWidthFactor;
-        float plotAreaWidthFactorOffset;
-        bool pointEditAreaResize;
+        bool pointEditAreaVisible, pointEditAreaResize; 
+        float plotAreaWidthFactor, plotAreaWidthFactorOffset;
                 
         // Audio waveform
         AudioClip audioClip;
         Texture2D audioClipTexture;
-        bool shouldRepaintWaveform;
-        bool audioWaveformVisible;
-        float lastAudioClipPaintedZoom = 1f;
-        bool normalizeWaveform;
-        float renderScale = 1f;
+        bool audioWaveformVisible, shouldRepaintWaveform, normalizeWaveform;
+        float lastAudioClipPaintedZoom, renderScale;
 
         // Debug
-        bool debugMode;
-        bool drawRects;
+        bool debugMode, drawRects;
 
         #endregion
 
@@ -165,7 +151,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             ahapFile = null;
             projectName = "";
             audioClip = null;
-            renderScale = 1f;
+            renderScale = lastAudioClipPaintedZoom = 1f;
             audioWaveformVisible = normalizeWaveform = shouldRepaintWaveform = false;
             pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < pointDragModes.Length; i++)

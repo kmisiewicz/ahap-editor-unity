@@ -661,15 +661,18 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (vibrationEvent is TransientEvent transientEvent)
                 {
-                    Handles.color = Colors.eventTransient;
+                    if (IsTimeInView(transientEvent.Time))
+                    {
+                        Handles.color = Colors.eventTransient;
 
-                    Vector3 intensityPoint = PointToScrollCoords(transientEvent.Time, transientEvent.Intensity.Value);
-                    Handles.DrawSolidDisc(intensityPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, plotScreenSize.y));
+                        Vector3 intensityPoint = PointToScrollCoords(transientEvent.Time, transientEvent.Intensity.Value);
+                        Handles.DrawSolidDisc(intensityPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                        Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, intensityPoint, new Vector3(intensityPoint.x, plotScreenSize.y));
 
-                    Vector3 sharpnessPoint = PointToScrollCoords(transientEvent.Time, transientEvent.Sharpness.Value, plotHeightOffset);
-                    Handles.DrawSolidDisc(sharpnessPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
-                    Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, plotHeightOffset + plotScreenSize.y));
+                        Vector3 sharpnessPoint = PointToScrollCoords(transientEvent.Time, transientEvent.Sharpness.Value, plotHeightOffset);
+                        Handles.DrawSolidDisc(sharpnessPoint, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                        Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, plotHeightOffset + plotScreenSize.y));
+                    }
                 }
                 else if (vibrationEvent is ContinuousEvent continuousEvent)
                 {
@@ -679,15 +682,37 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                     void DrawContinuousEvent(List<EventPoint> curve, float heightOffset = 0)
                     {
-                        List<Vector3> points = new() { PointToScrollCoords(curve[0].Time, 0, heightOffset) };
+                        List<Vector3> points = new();
                         int pointCount = curve.Count;
+                        int startIndex = 0, endIndex = pointCount - 1;
                         for (int i = 0; i < pointCount; i++)
                         {
-                            EventPoint point = curve[i];
-                            points.Add(PointToScrollCoords(point.Time, point.Value, heightOffset));
-                            Handles.DrawSolidDisc(points.Last(), POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                            if (IsTimeInView(curve[i].Time))
+                            {
+                                startIndex = Mathf.Max(i - 1, 0);
+                                break;
+                            }
                         }
-                        points.Add(PointToScrollCoords(curve[pointCount - 1].Time, 0, heightOffset));
+                        for (int j = pointCount - 1; j >= 0; j--)
+                        {
+                            if (IsTimeInView(curve[j].Time))
+                            {
+                                endIndex = Mathf.Min(j + 1, pointCount - 1);
+                                break;
+                            }
+                        }
+                        if (startIndex == 0)
+                            points.Add(PointToScrollCoords(curve[0].Time, 0, heightOffset));
+                        for (int k = startIndex; k <= endIndex; k++)
+                        {
+                            EventPoint point = curve[k];
+                            Vector3 pointScrollCoords = PointToScrollCoords(point.Time, point.Value, heightOffset);
+                            points.Add(pointScrollCoords);
+                            Handles.DrawSolidDisc(pointScrollCoords, POINT_NORMAL, PLOT_EVENT_POINT_SIZE);
+                        }
+                        if (endIndex == pointCount - 1)
+                            points.Add(PointToScrollCoords(curve[pointCount - 1].Time, 0, heightOffset));
+
                         Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, points.ToArray());
                     }
                 }
@@ -852,6 +877,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         }
 
         #region Helper functions
+
+        private bool IsTimeInView(float time)
+        {
+            float scrollTime = time / this.time * plotScrollSize.x;
+            return scrollTime >= scrollPosition.x && scrollTime <= scrollPosition.x + plotScreenSize.x;
+        }
 
         private Vector3 PointToScrollCoords(float time, float value, float heightOffset = 0)
         {

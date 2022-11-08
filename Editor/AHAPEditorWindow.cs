@@ -925,6 +925,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return null;
         }
 
+        private float GetFirstPointTime() => events.Min(e => e.Time);
+        
         private float GetLastPointTime()
         {
             float lastPointTime = 0, t;

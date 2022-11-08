@@ -8,6 +8,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     internal class AudioClipUtils
     {
+        // Adjusted code from answers
+        // https://answers.unity.com/questions/699595/how-to-generate-waveform-from-audioclip.html
         public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
         {
             // Calculate samples

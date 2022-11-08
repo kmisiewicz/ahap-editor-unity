@@ -70,11 +70,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             public static readonly GUIContent waveformVisibleLabel = EditorGUIUtility.TrTextContent("Visible");
             public static readonly GUIContent normalizeLabel = EditorGUIUtility.TrTextContent("Normalize");
-            public static readonly GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale");
-            public static readonly GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project", "Name that will be save in project's metadata.");
+            public static readonly GUIContent renderScaleLabel = EditorGUIUtility.TrTextContent("Render scale",
+                "Lower scale will reduce quality but improve render time.");
+            public static readonly GUIContent projectNameLabel = EditorGUIUtility.TrTextContent("Project name",
+                "Name that will be save in project's metadata.");
             public static readonly GUIContent timeLabel = EditorGUIUtility.TrTextContent("Time");
             public static readonly GUIContent zoomLabel = EditorGUIUtility.TrTextContent("Zoom");
             public static readonly GUIContent drawRectsLabel = EditorGUIUtility.TrTextContent("Draw Rects");
+            public static readonly GUIContent snappingLabel = EditorGUIUtility.TrTextContent("Snapping");
             public static readonly GUIContent yAxisLabelDummy = EditorGUIUtility.TrTextContent("#.##");
             public static readonly GUIContent xAxisLabelDummy = EditorGUIUtility.TrTextContent("##.###");
         }
@@ -88,14 +91,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         // Data
         TextAsset ahapFile;
-        float time = 1f;        
         string projectName = "";
         List<VibrationEvent> events = new();
 
         // Drawing
-        float zoom = 1f;
+        float time, zoom;
         Vector2 plotScreenSize, plotScrollSize, scrollPosition;
-        float plotHeightOffset; // Difference between plots top left corner
+        float plotHeightOffset; // Height difference between plots
         EventType previousMouseState = EventType.MouseUp;
         MouseLocation mouseLocation, mouseClickLocation, selectedPointLocation;
         Vector2 mouseClickPosition, mouseClickPlotPosition;
@@ -181,10 +183,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float lineHalfHeight = lineHeight * 0.5f;
             float lineDoubleSpacing = lineSpacing * 2;
 
-            float topBarHeight = lineWithSpacing * 3 + lineHalfHeight + lineDoubleSpacing;
+            float topBarHeight = lineWithSpacing * 4 + lineHalfHeight + lineDoubleSpacing;
             Rect topBarRect = new(CONTENT_MARGIN, new Vector2(position.width - CONTENT_MARGIN.x * 2, topBarHeight));
             float topBarOptionsContainerWidth = Screen.currentResolution.height * TOP_BAR_OPTIONS_SIZE_FACTOR;
             var topBarMaxWidthOption = GUILayout.MaxWidth(topBarOptionsContainerWidth);
+            var topBarContainerHalfOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.5f);
             var topBarContainerThirdOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f);
 
             float bottomPartHeight = position.height - CONTENT_MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
@@ -270,7 +273,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (currentEvent.control)
                 {
-                    zoom += currentEvent.delta.y < 0 ? ZOOM_INCREMENT : -ZOOM_INCREMENT;
+                    zoom += -Mathf.Sign(currentEvent.delta.y) * ZOOM_INCREMENT;
                     zoom = Mathf.Clamp(zoom, 1, MAX_ZOOM);
                 }
                 else if (zoom > 1f)
@@ -467,6 +470,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 GUILayout.BeginVertical(GUI.skin.box, topBarContainerThirdOption);
                 EditorGUILayout.LabelField("GUI Debug", EditorStyles.boldLabel, topBarContainerThirdOption);
+
                 if (GUILayout.Button("Log rects", topBarContainerThirdOption))
                 {
                     StringBuilder sb = new("Rects:\n");
@@ -484,85 +488,115 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     sb.AppendLine($"Resize bar: {resizeBarRect} (white)");
                     Debug.Log(sb.ToString());
                 }
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.drawRectsLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-                drawRects = EditorGUILayout.Toggle(Content.drawRectsLabel, drawRects, topBarContainerThirdOption);
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Content.drawRectsLabel);
+                drawRects = GUILayout.Toggle(drawRects, GUIContent.none);
+                GUILayout.EndHorizontal();
+
+                GUILayout.FlexibleSpace();
+
                 GUILayout.EndVertical();
             }
 
             // File
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("File", EditorStyles.boldLabel);
-            GUILayout.BeginHorizontal();
-            ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false, topBarContainerThirdOption) as TextAsset;
-            GUI.enabled = ahapFile != null;
-            if (GUILayout.Button("Import", topBarContainerThirdOption))
-                HandleImport();
-            GUI.enabled = true;
-            if (GUILayout.Button("Save", topBarContainerThirdOption))
-                HandleSaving();
-            GUILayout.EndHorizontal();
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.projectNameLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            projectName = EditorGUILayout.TextField(Content.projectNameLabel, projectName);
+            {
+                EditorGUILayout.LabelField("File", EditorStyles.boldLabel);
+
+                ahapFile = EditorGUILayout.ObjectField(GUIContent.none, ahapFile, typeof(TextAsset), false) as TextAsset;
+
+                GUILayout.BeginHorizontal();
+                GUI.enabled = ahapFile != null;
+                if (GUILayout.Button("Import"))
+                    HandleImport();
+                GUI.enabled = true;
+                if (GUILayout.Button("Save"))
+                    HandleSaving();
+                GUILayout.EndHorizontal();
+
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.projectNameLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                projectName = EditorGUILayout.TextField(Content.projectNameLabel, projectName);
+            }
             GUILayout.EndVertical();
 
             // Audio waveform
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("Reference waveform", EditorStyles.boldLabel);
-            GUILayout.BeginHorizontal();
-            EditorGUI.BeginChangeCheck();
-            audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false) as AudioClip;
-            if (EditorGUI.EndChangeCheck())
             {
-                AudioClipUtils.StopAllClips();
-                audioWaveformVisible = false;
+                EditorGUILayout.LabelField("Reference waveform", EditorStyles.boldLabel);
+
+                GUILayout.BeginHorizontal();
+                EditorGUI.BeginChangeCheck();
+                audioClip = EditorGUILayout.ObjectField(GUIContent.none, audioClip, typeof(AudioClip), false) as AudioClip;
+                if (EditorGUI.EndChangeCheck())
+                {
+                    AudioClipUtils.StopAllClips();
+                    audioWaveformVisible = false;
+                }
+                GUI.enabled = audioClip != null;
+                if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), EditorStyles.miniButton, GUILayout.MaxWidth(30)))
+                    AudioClipUtils.PlayClip(audioClip);
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                EditorGUI.BeginChangeCheck();
+                audioWaveformVisible = GUILayout.Toggle(audioWaveformVisible, Content.waveformVisibleLabel, GUI.skin.button, topBarContainerHalfOption);
+                normalizeWaveform = GUILayout.Toggle(normalizeWaveform, Content.normalizeLabel, GUI.skin.button, topBarContainerHalfOption);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (audioWaveformVisible) shouldRepaintWaveform = true;
+                    else lastAudioClipPaintedZoom = 0;
+                }                    
+                GUILayout.EndHorizontal();
+
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                renderScale = Mathf.Clamp(EditorGUILayout.FloatField(Content.renderScaleLabel, renderScale),
+                    MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
+                GUI.enabled = true;
             }
-            GUI.enabled = audioClip != null;
-            if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), GUILayout.MaxWidth(25)))
-                AudioClipUtils.PlayClip(audioClip);
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.waveformVisibleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            EditorGUI.BeginChangeCheck();
-            audioWaveformVisible = EditorGUILayout.Toggle(Content.waveformVisibleLabel, audioWaveformVisible, topBarContainerThirdOption);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (!audioWaveformVisible)
-                lastAudioClipPaintedZoom = 0;
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.normalizeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            normalizeWaveform = EditorGUILayout.Toggle(Content.normalizeLabel, normalizeWaveform);
-            if (EditorGUI.EndChangeCheck() && audioWaveformVisible)
-                shouldRepaintWaveform = true;
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            renderScale = Mathf.Clamp(EditorGUILayout.FloatField(Content.renderScaleLabel, renderScale),
-                MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
             GUILayout.EndVertical();
 
-            // Plot
+            // Plot view
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("Plot", EditorStyles.boldLabel);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reset zoom", topBarContainerThirdOption))
-                zoom = 1;
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            zoom = (float)Math.Round(EditorGUILayout.Slider(Content.zoomLabel, zoom, 1, MAX_ZOOM), 1);
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Clear", topBarContainerThirdOption))
-                Clear();
-            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-            time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, time), GetLastPointTime()), MIN_TIME, MAX_TIME);
-            if (audioClip != null)
-                time = Mathf.Max(time, audioClip.length);
-            EditorGUIUtility.labelWidth = 0;
-            GUILayout.EndHorizontal();
+            {
+                EditorGUILayout.LabelField("Plot view", EditorStyles.boldLabel);
+
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Reset zoom", topBarContainerThirdOption))
+                    zoom = 1;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                zoom = (float)Math.Round(EditorGUILayout.Slider(Content.zoomLabel, zoom, 1, MAX_ZOOM), 1);
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                //if (GUILayout.Button("Clear", topBarContainerThirdOption))
+                //    Clear();
+                if (GUILayout.Button("Trim", topBarContainerThirdOption))
+                    time = GetLastPointTime();
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, time), GetLastPointTime()), MIN_TIME, MAX_TIME);
+                if (audioClip != null)
+                    time = Mathf.Max(time, audioClip.length);
+                EditorGUIUtility.labelWidth = 0;
+                GUILayout.EndHorizontal();
+
+                EditorGUILayout.GetControlRect();
+            }
             GUILayout.EndVertical();
 
             // Point editing
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
-            EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
-            //pointDragMode = (PointDragMode)GUILayout.Toolbar((int)pointDragMode, pointDragModes);
-            pointEditAreaVisible = EditorGUILayout.Toggle("Advanced panel", pointEditAreaVisible);
-            snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
+            {
+                EditorGUILayout.LabelField("Point editing", EditorStyles.boldLabel);
+
+                pointDragMode = (PointDragMode)GUILayout.Toolbar((int)pointDragMode, pointDragModes);
+
+                pointEditAreaVisible = GUILayout.Toggle(pointEditAreaVisible, "Advanced panel", GUI.skin.button);
+
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.snappingLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                snapMode = (SnapMode)EditorGUILayout.EnumPopup("Snapping", snapMode);
+                EditorGUIUtility.labelWidth = 0;
+            }
             GUILayout.EndVertical();
 
             GUILayout.EndHorizontal();

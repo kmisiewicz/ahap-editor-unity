@@ -931,7 +931,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             foreach (var ev in events)
             {
                 t = ev is TransientEvent ? ev.Time : ((ContinuousEvent)ev).IntensityCurve.Last().Time;
-                t = Mathf.Max(t, lastPointTime);
+                lastPointTime = Mathf.Max(t, lastPointTime);
             }
             return lastPointTime;
         }

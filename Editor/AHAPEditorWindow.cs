@@ -532,6 +532,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     AudioClipUtils.StopAllClips();
                     _audioWaveformVisible = false;
+                    if (_audioClip != null) 
+                    {
+                        if (_audioClip.length > MAX_TIME)
+                        {
+                            _audioClip = null;
+                            EditorUtility.DisplayDialog("Clip too long", $"Selected audio clip is longer than max allowed {MAX_TIME}s.", "OK");
+                        }
+                    }
                 }
                 GUI.enabled = _audioClip != null;
                 if (GUILayout.Button(EditorGUIUtility.IconContent("d_PlayButton"), EditorStyles.miniButton, GUILayout.MaxWidth(30)))

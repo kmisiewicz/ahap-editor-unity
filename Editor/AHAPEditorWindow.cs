@@ -99,7 +99,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var topBarContainerThirdOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f);
 
             float bottomPartHeight = position.height - CONTENT_MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
-            Rect bottomPartRect = new(CONTENT_MARGIN.x, CONTENT_MARGIN.y + topBarHeight + lineDoubleSpacing, topBarRect.width, bottomPartHeight);
+            Rect bottomPartRect = new(CONTENT_MARGIN.x, CONTENT_MARGIN.y + topBarHeight + lineDoubleSpacing,
+                topBarRect.width, bottomPartHeight);
 
             float plotAreaWidth = bottomPartRect.width * (_pointEditAreaVisible ? _plotAreaWidthFactor : 1);
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
@@ -113,8 +114,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             float singlePlotAreaHeight = (plotAreaRect.height - lineHeight) * 0.5f - lineSpacing;
             Rect intensityPlotAreaRect = new(plotAreaRect.position, new Vector2(plotAreaWidth, singlePlotAreaHeight));
-            Rect sharpnessPlotAreaRect = new(new Vector2(plotAreaRect.x, plotAreaRect.y + intensityPlotAreaRect.height + lineDoubleSpacing),
-                intensityPlotAreaRect.size);
+            Rect sharpnessPlotAreaRect = new(intensityPlotAreaRect);
+            sharpnessPlotAreaRect.y += intensityPlotAreaRect.height + lineDoubleSpacing;
 
             Vector2 yAxisLabelSize = EditorStyles.label.CalcSize(Content.yAxisDummyLabel);
             yAxisLabelSize.x += CUSTOM_LABEL_WIDTH_OFFSET;
@@ -134,7 +135,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 plotAreaRect.width - plotOffsetLeftTop.x - plotOffsetRightBottom.x,
                 plotAreaRect.height - plotOffsetLeftTop.y - lineDoubleSpacing);
             _plotScrollSize = new Vector2(scrollRect.width * _zoom, intensityPlotRect.height);
-            Rect scrollPlotRect = new(0, 0, _plotScrollSize.x, _plotScreenSize.y);
+            Rect scrollPlotRect = new(Vector2.zero, _plotScrollSize);
             Rect scrollContentRect = new(0, 0, _plotScrollSize.x, scrollRect.height);
 
             int xAxisLabelCount = (int)(_plotScrollSize.x / xAxisLabelSize.x);
@@ -166,7 +167,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 EditorGUI.DrawRect(sharpnessPlotRect, Color.blue);
                 EditorGUI.DrawRect(scrollRect, new Color(1, 1, 1, 0.6f));
                 EditorGUI.DrawRect(yAxisLabelRect, Color.white);                
-                EditorGUI.DrawRect(new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size), Color.white);
+                EditorGUI.DrawRect(new Rect(intensityPlotRect.position + xAxisLabelRect.position,
+                    xAxisLabelRect.size), Color.white);
                 EditorGUI.DrawRect(resizeBarRect, Color.white);
             }
 
@@ -215,14 +217,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (_mouseLocation != MouseLocation.Outside)
             {
                 plotRectMousePosition = currentEvent.mousePosition - mousePlotRect.position;
-                float x = (_scrollPosition.x + plotRectMousePosition.x) / _plotScrollSize.x * _time;
-                float y = (_plotScreenSize.y - plotRectMousePosition.y) / _plotScreenSize.y;
+                plotPosition.x = (_scrollPosition.x + plotRectMousePosition.x) / _plotScrollSize.x * _time;
+                plotPosition.y = (_plotScreenSize.y - plotRectMousePosition.y) / _plotScreenSize.y;
                 if (_snapMode != SnapMode.None)
                 {
-                    x = (float)Math.Round(x, (int)_snapMode);
-                    y = (float)Math.Round(y, (int)_snapMode);
+                    plotPosition.x = (float)Math.Round(plotPosition.x, (int)_snapMode);
+                    plotPosition.y = (float)Math.Round(plotPosition.y, (int)_snapMode);
                 }
-                plotPosition = new Vector2(x, y);
 
                 _hoverPoint = _draggedPoint ?? GetEventPointOnPosition(plotPosition, _mouseLocation, out _hoverPointEvent);
 
@@ -238,20 +239,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             _mouseClickPlotPosition = plotPosition;
                             _previousMouseState = EventType.MouseDown;
                         }
-                        else if (_previousMouseState == EventType.MouseDown && currentEvent.type == EventType.MouseDrag) // Start dragging if not between continuous event points
+                        else if (_previousMouseState == EventType.MouseDown && currentEvent.type == EventType.MouseDrag) 
                         {
-                            _previousMouseState = TryGetContinuousEventOnTime(plotPosition.x, out _) ? EventType.MouseUp : EventType.MouseDrag;
+                            _previousMouseState = TryGetContinuousEvent(plotPosition.x, out _) ? EventType.MouseUp : EventType.MouseDrag;
                         }
                         else if (currentEvent.type == EventType.MouseUp && _mouseClickLocation == _mouseLocation) // LMB up
                         {
                             if (_previousMouseState == EventType.MouseDown) // Just clicked
                             {
-                                if (TryGetContinuousEventOnTime(plotPosition.x, out ContinuousEvent ce)) // Add point to continuous event if clicked between start and end
+                                if (TryGetContinuousEvent(plotPosition.x, out ContinuousEvent ce)) // Add point to continuous event if clicked between start and end
                                     ce.AddPointToCurve(plotPosition, _mouseLocation);
                                 else // Add transient event
                                     _events.Add(new TransientEvent(plotPosition, _mouseLocation));
                             }
-                            else if (_previousMouseState == EventType.MouseDrag && !TryGetContinuousEventOnTime(plotPosition.x, out _))
+                            else if (_previousMouseState == EventType.MouseDrag && !TryGetContinuousEvent(plotPosition.x, out _))
                             {
                                 Vector2 endPoint = currentEvent.shift ? new Vector2(plotPosition.x, _mouseClickPlotPosition.y) : plotPosition;
                                 _events.Add(new ContinuousEvent(_mouseClickPlotPosition, endPoint, _mouseLocation));
@@ -393,7 +394,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
                         sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
                         sb.AppendLine($"Y axis label rect: {yAxisLabelRect} (white)");
-                        sb.AppendLine($"X axis label rect: {new Rect(xAxisLabelRect.position + intensityPlotRect.position, xAxisLabelRect.size)} (white)");
+                        sb.AppendLine($"X axis label rect: {new Rect(intensityPlotRect.position + xAxisLabelRect.position, xAxisLabelRect.size)} (white)");
                         sb.AppendLine($"Resize bar: {resizeBarRect} (white)");
                         Debug.Log(sb.ToString());
                     }
@@ -476,6 +477,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 EditorGUILayout.LabelField(Content.plotViewLabel, EditorStyles.boldLabel);
 
+                GUILayout.Space(-1);
+
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(Content.zoomResetLabel, topBarContainerThirdOption)) _zoom = 1;
                 EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
@@ -484,18 +487,17 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
-                //if (GUILayout.Button(Content.clearButtonLabel, topBarContainerThirdOption))
-                //    Clear();
                 if (GUILayout.Button(Content.trimButtonLabel, topBarContainerThirdOption))
-                    _time = (_waveformClip != null) ? _waveformClip.length : GetLastPointTime();
+                    _time = _waveformClip != null ? _waveformClip.length : GetLastPointTime();
                 EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
                 _time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, _time), GetLastPointTime()), MIN_TIME, MAX_TIME);
-                if (_waveformClip != null)
-                    _time = Mathf.Max(_time, _waveformClip.length);
+                if (_waveformClip != null) _time = Mathf.Max(_time, _waveformClip.length);
                 EditorGUIUtility.labelWidth = 0;
                 GUILayout.EndHorizontal();
 
-                EditorGUILayout.GetControlRect();
+                if (GUILayout.Button(Content.clearLabel)) Clear();
+
+                GUILayout.Space(-1);
             }
             GUILayout.EndVertical();
 
@@ -503,6 +505,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             {
                 EditorGUILayout.LabelField(Content.pointEditingLabel, EditorStyles.boldLabel);
+
+                GUILayout.Space(-1);
 
                 _pointDragMode = (PointDragMode)GUILayout.Toolbar((int)_pointDragMode, _pointDragModes);
 

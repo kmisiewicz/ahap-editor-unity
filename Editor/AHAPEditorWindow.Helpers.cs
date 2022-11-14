@@ -58,7 +58,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 plotRect.y + plotRect.height - point.Value * plotRect.height);
         }
 
-        private bool TryGetContinuousEventOnTime(float time, out ContinuousEvent continuousEvent)
+        private bool TryGetContinuousEvent(float time, out ContinuousEvent continuousEvent)
         {
             continuousEvent = null;
             foreach (var ev in _events)

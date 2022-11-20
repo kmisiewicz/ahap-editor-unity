@@ -37,11 +37,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         EventPoint _hoverPoint, _draggedPoint;
         VibrationEvent _hoverPointEvent, _draggedPointEvent;
         List<EventPoint> _selectedPoints;
+        bool _selectingPoints;
         float _dragMin, _dragMax;
         string[] _pointDragModes;
         PointDragMode _pointDragMode = PointDragMode.FreeMove;
         SnapMode _snapMode = SnapMode.None;
-        bool _pointEditAreaVisible, _pointEditAreaResize; 
+        bool _pointEditAreaVisible, _pointEditAreaResize;
         float _plotAreaWidthFactor, _plotAreaWidthFactorOffset;
                 
         // Audio waveform
@@ -238,31 +239,40 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             _mouseClickLocation = _mouseLocation;
                             _mouseClickPlotPosition = plotPosition;
                             _previousMouseState = EventType.MouseDown;
+                            if (currentEvent.control) _selectingPoints = true;
                         }
                         else if (_previousMouseState == EventType.MouseDown && currentEvent.type == EventType.MouseDrag) 
                         {
-                            _previousMouseState = TryGetContinuousEvent(plotPosition.x, out _) ? EventType.MouseUp : EventType.MouseDrag;
+                            _previousMouseState = (!_selectingPoints && TryGetContinuousEvent(plotPosition.x, out _)) ? EventType.MouseUp : EventType.MouseDrag;
                         }
                         else if (currentEvent.type == EventType.MouseUp && _mouseClickLocation == _mouseLocation) // LMB up
                         {
-                            if (_previousMouseState == EventType.MouseDown) // Just clicked
+                            if (_selectingPoints)
                             {
-                                if (TryGetContinuousEvent(plotPosition.x, out ContinuousEvent ce)) // Add point to continuous event if clicked between start and end
-                                    ce.AddPointToCurve(plotPosition, _mouseLocation);
-                                else // Add transient event
-                                    _events.Add(new TransientEvent(plotPosition, _mouseLocation));
+
+                                _selectingPoints = false;
                             }
-                            else if (_previousMouseState == EventType.MouseDrag && !TryGetContinuousEvent(plotPosition.x, out _))
+                            else
                             {
-                                Vector2 endPoint = currentEvent.shift ? new Vector2(plotPosition.x, _mouseClickPlotPosition.y) : plotPosition;
-                                _events.Add(new ContinuousEvent(_mouseClickPlotPosition, endPoint, _mouseLocation));
+                                if (_previousMouseState == EventType.MouseDown) // Just clicked
+                                {
+                                    if (TryGetContinuousEvent(plotPosition.x, out ContinuousEvent ce)) // Add point to continuous event if clicked between start and end
+                                        ce.AddPointToCurve(plotPosition, _mouseLocation);
+                                    else // Add transient event
+                                        _events.Add(new TransientEvent(plotPosition, _mouseLocation));
+                                }
+                                else if (_previousMouseState == EventType.MouseDrag && !TryGetContinuousEvent(plotPosition.x, out _))
+                                {
+                                    Vector2 endPoint = currentEvent.shift ? new Vector2(plotPosition.x, _mouseClickPlotPosition.y) : plotPosition;
+                                    _events.Add(new ContinuousEvent(_mouseClickPlotPosition, endPoint, _mouseLocation));
+                                }
                             }
                             _previousMouseState = EventType.MouseUp;
                         }
                     }
                     else if (_draggedPoint == null && currentEvent.type == EventType.MouseDown) // Hovering over point - start dragging it
                     {
-                        _selectedPoints.Clear();
+                        //_selectedPoints.Clear();
                         _previousMouseState = EventType.MouseDown;
                         _draggedPoint = _hoverPoint;
                         _draggedPointEvent = _hoverPointEvent;
@@ -330,9 +340,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
             if (currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseUp)
             {
-                if (_draggedPoint != null)
+                if (_draggedPoint != null && !_selectedPoints.Contains(_draggedPoint))
                 {
-                    _selectedPoints.Insert(0, _draggedPoint);
+                    _selectedPoints.Add(_draggedPoint);
                     _selectedPointLocation = _mouseLocation;
                 }
                 _draggedPoint = null;
@@ -686,16 +696,27 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     new Vector3(mousePlotRect.xMax, windowMousePositionProcessed.y));
                 Handles.DrawSolidDisc(windowMousePositionProcessed, POINT_NORMAL, HOVER_DOT_SIZE);
 
-                // Continuous event creation
+                // Drag - continuous event creation or selecting multiple points
                 if (_draggedPoint == null && currentEvent.button == (int)MouseButton.Left && _previousMouseState == EventType.MouseDrag && _mouseLocation == _mouseClickLocation)
                 {
-                    Vector3 leftPoint = _mouseClickPosition;
-                    Vector3 rightPoint = currentEvent.shift ? new Vector3(windowMousePositionProcessed.x, _mouseClickPosition.y) : windowMousePositionProcessed;
-                    if (leftPoint.x > rightPoint.x)
-                        (leftPoint, rightPoint) = (rightPoint, leftPoint);
-                    Handles.color = Colors.eventContinuousCreation;
-                    Handles.DrawAAConvexPolygon(leftPoint, rightPoint, new Vector3(rightPoint.x, mousePlotRect.yMax),
-                        new Vector3(leftPoint.x, mousePlotRect.yMax), leftPoint);
+                    if (_selectingPoints)
+                    {
+                        Rect selectionRect = new(Mathf.Min(_mouseClickPosition.x, windowMousePositionProcessed.x),
+                            Mathf.Min(_mouseClickPosition.y, windowMousePositionProcessed.y),
+                            Mathf.Abs(_mouseClickPosition.x - windowMousePositionProcessed.x),
+                            Mathf.Abs(_mouseClickPosition.y - windowMousePositionProcessed.y));
+                        EditorUtils.DrawRectWithBorder(selectionRect, 2, Colors.draggedPoint, Colors.plotBorder);
+                    }
+                    else
+                    {
+                        Vector3 leftPoint = _mouseClickPosition;
+                        Vector3 rightPoint = currentEvent.shift ? new Vector3(windowMousePositionProcessed.x, _mouseClickPosition.y) : windowMousePositionProcessed;
+                        if (leftPoint.x > rightPoint.x)
+                            (leftPoint, rightPoint) = (rightPoint, leftPoint);
+                        Handles.color = Colors.eventContinuousCreation;
+                        Handles.DrawAAConvexPolygon(leftPoint, rightPoint, new Vector3(rightPoint.x, mousePlotRect.yMax),
+                            new Vector3(leftPoint.x, mousePlotRect.yMax), leftPoint);
+                    }
                 }
             }
 
@@ -735,16 +756,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             // Plot borders
-            Handles.color = Colors.plotBorder;
-            DrawBorderForRect(intensityPlotRect);
-            DrawBorderForRect(sharpnessPlotRect);
-            
-            void DrawBorderForRect(Rect rect)
-            {
-                Handles.DrawAAPolyLine(PLOT_BORDER_WIDTH,
-                    rect.position, new Vector3(rect.xMax, rect.y), 
-                    rect.max, new Vector3(rect.x, rect.yMax), rect.position);
-            }
+            EditorUtils.DrawRectBorder(intensityPlotRect, PLOT_BORDER_WIDTH, Colors.plotBorder);
+            EditorUtils.DrawRectBorder(sharpnessPlotRect, PLOT_BORDER_WIDTH, Colors.plotBorder);
 
             #endregion
 

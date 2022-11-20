@@ -58,6 +58,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 plotRect.y + plotRect.height - point.Value * plotRect.height);
         }
 
+        private Vector3 PointToWindowCoords(Vector2 point, Rect plotRect)
+        {
+            return new Vector3(plotRect.x + point.x / _time * _plotScrollSize.x - _scrollPosition.x,
+                plotRect.y + plotRect.height - point.y * plotRect.height);
+        }
+
         private bool TryGetContinuousEvent(float time, out ContinuousEvent continuousEvent)
         {
             continuousEvent = null;

@@ -67,49 +67,50 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             }
                             else if (e.EventType == AHAPFile.EVENT_CONTINUOUS)
                             {
-                                List<EventPoint> intensityPoints = new();
+                                ContinuousEvent ce = new();
+
+                                List<EventPoint> points = new();
                                 float t = (float)e.Time;
                                 Pattern curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
-                                        intensityPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
-
-                                    t = intensityPoints.Last().Time;
+                                        points.Add(new EventPoint((float)point.Time, (float)point.ParameterValue, ce));
+                                    t = points.Last().Time;
                                     curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
                                 }
-                                if (intensityPoints.Count == 0)
+                                if (points.Count == 0)
                                 {
-                                    intensityPoints.Add(new EventPoint((float)e.Time, intensity));
-                                    intensityPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), intensity));
+                                    points.Add(new EventPoint((float)e.Time, intensity, ce));
+                                    points.Add(new EventPoint((float)(e.Time + e.EventDuration), intensity, ce));
                                 }
-                                else if (!Mathf.Approximately(intensityPoints.Last().Time, (float)(e.Time + e.EventDuration)))
+                                else if (!Mathf.Approximately(points.Last().Time, (float)(e.Time + e.EventDuration)))
                                 {
-                                    intensityPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), intensityPoints.Last().Value));
+                                    points.Add(new EventPoint((float)(e.Time + e.EventDuration), points.Last().Value, ce));
                                 }
+                                ce.IntensityCurve = points;
 
-                                List<EventPoint> sharpnessPoints = new();
+                                points = new();
                                 t = (float)e.Time;
                                 curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t);
                                 while (curve != null)
                                 {
                                     foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
-                                        sharpnessPoints.Add(new EventPoint((float)point.Time, (float)point.ParameterValue));
-
-                                    t = sharpnessPoints.Last().Time;
+                                        points.Add(new EventPoint((float)point.Time, (float)point.ParameterValue, ce));
+                                    t = points.Last().Time;
                                     curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
                                 }
-                                if (sharpnessPoints.Count == 0)
+                                if (points.Count == 0)
                                 {
-                                    sharpnessPoints.Add(new EventPoint((float)e.Time, sharpness));
-                                    sharpnessPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), sharpness));
+                                    points.Add(new EventPoint((float)e.Time, sharpness, ce));
+                                    points.Add(new EventPoint((float)(e.Time + e.EventDuration), sharpness, ce));
                                 }
-                                else if (!Mathf.Approximately(sharpnessPoints.Last().Time, (float)(e.Time + e.EventDuration)))
+                                else if (!Mathf.Approximately(points.Last().Time, (float)(e.Time + e.EventDuration)))
                                 {
-                                    intensityPoints.Add(new EventPoint((float)(e.Time + e.EventDuration), sharpnessPoints.Last().Value));
+                                    points.Add(new EventPoint((float)(e.Time + e.EventDuration), points.Last().Value, ce));
                                 }
+                                ce.SharpnessCurve = points;
 
-                                ContinuousEvent ce = new() { IntensityCurve = intensityPoints, SharpnessCurve = sharpnessPoints };
                                 _events.Add(ce);
                             }
                         }

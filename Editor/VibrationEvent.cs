@@ -10,14 +10,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
     {
         public float Time;
         public float Value;
+        public VibrationEvent ParentEvent;
 
-        public EventPoint(float time, float value)
+        public EventPoint(float time, float value, VibrationEvent parent)
         {
             Time = time;
             Value = value;
+            ParentEvent = parent;
         }
 
-        public static implicit operator EventPoint(Vector2 v2) => new EventPoint(v2.x, v2.y);
+        //public static implicit operator EventPoint(Vector2 v2) => new EventPoint(v2.x, v2.y);
 
         public static implicit operator Vector2(EventPoint point) => new Vector2(point.Time, point.Value);
     }
@@ -42,14 +44,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public TransientEvent(float time, float intensity, float sharpness)
         {
-            Intensity = new EventPoint(time, intensity);
-            Sharpness = new EventPoint(time, sharpness);
+            Intensity = new EventPoint(time, intensity, this);
+            Sharpness = new EventPoint(time, sharpness, this);
         }
 
-        public TransientEvent(EventPoint point, MouseLocation plot)
+        public TransientEvent(Vector2 pointPosition, MouseLocation plot)
         {
-            Intensity = plot == MouseLocation.IntensityPlot ? point : new EventPoint(point.Time, 0.5f);
-            Sharpness = plot == MouseLocation.SharpnessPlot ? point : new EventPoint(point.Time, 0.5f);
+            EventPoint point = new(pointPosition.x, pointPosition.y, this);
+            EventPoint midPoint = new(point.Time, 0.5f, this);
+            Intensity = plot == MouseLocation.IntensityPlot ? point : midPoint;
+            Sharpness = plot == MouseLocation.SharpnessPlot ? point : midPoint;
         }
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
@@ -86,16 +90,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public ContinuousEvent(Vector2 startEndTimes, Vector2 intensity, Vector2 sharpness)
         {
-            IntensityCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, intensity.x), new EventPoint(startEndTimes.y, intensity.y) };
-            SharpnessCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, sharpness.x), new EventPoint(startEndTimes.y, sharpness.y) };
+            IntensityCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, intensity.x, this),
+                new EventPoint(startEndTimes.y, intensity.y, this) };
+            SharpnessCurve = new List<EventPoint>() { new EventPoint(startEndTimes.x, sharpness.x, this),
+                new EventPoint(startEndTimes.y, sharpness.y, this) };
         }
 
         public ContinuousEvent(Vector2 firstPoint, Vector2 secondPoint, MouseLocation plot)
         {
             if (firstPoint.x > secondPoint.x)
                 (firstPoint, secondPoint) = (secondPoint, firstPoint);
-            List<EventPoint> specCurve = new() { new EventPoint(firstPoint.x, firstPoint.y), new EventPoint(secondPoint.x, secondPoint.y) };
-            List<EventPoint> defaultCurve = new() { new EventPoint(firstPoint.x, 0.5f), new EventPoint(secondPoint.x, 0.5f) };
+            List<EventPoint> specCurve = new() { new EventPoint(firstPoint.x, firstPoint.y, this),
+                new EventPoint(secondPoint.x, secondPoint.y, this) };
+            List<EventPoint> defaultCurve = new() { new EventPoint(firstPoint.x, 0.5f, this),
+                new EventPoint(secondPoint.x, 0.5f, this) };
             IntensityCurve = plot == MouseLocation.IntensityPlot ? specCurve : defaultCurve;
             SharpnessCurve = plot == MouseLocation.SharpnessPlot ? specCurve : defaultCurve;
         }
@@ -149,7 +157,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return list;
         }
 
-        public void AddPointToCurve(EventPoint point, MouseLocation plot)
+        public void AddPointToCurve(Vector2 pointPosition, MouseLocation plot)
         {
             if (plot == MouseLocation.Outside)
             {
@@ -163,6 +171,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 Debug.LogError("Invalid curve!");
                 return;
             }
+
+            EventPoint point = new(pointPosition.x, pointPosition.y, this);
 
             curve.Add(point);
             curve.Sort((p1, p2) => p1.Time.CompareTo(p2.Time));

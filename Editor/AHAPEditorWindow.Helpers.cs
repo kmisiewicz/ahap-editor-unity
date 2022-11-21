@@ -69,7 +69,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             continuousEvent = null;
             foreach (var ev in _events)
             {
-                if (time > ev.Time && ev is ContinuousEvent ce && time < ce.IntensityCurve.Last().Time)
+                if (time >= ev.Time && ev is ContinuousEvent ce && time <= ce.IntensityCurve.Last().Time)
                 {
                     continuousEvent = ce;
                     return true;
@@ -78,17 +78,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return false;
         }
 
-        private EventPoint GetEventPointOnPosition(Vector2 plotPosition, MouseLocation plot, out VibrationEvent vibrationEvent)
+        private EventPoint GetPointOnPosition(Vector2 plotPosition, MouseLocation plot)
         {
-            vibrationEvent = null;
             Vector2 pointOffset = new(HOVER_OFFSET * _time / _plotScrollSize.x, HOVER_OFFSET / _plotScreenSize.y);
             foreach (var ev in _events)
             {
                 if (ev.IsOnPointInEvent(plotPosition, pointOffset, plot, out EventPoint eventPoint))
-                {
-                    vibrationEvent = ev;
                     return eventPoint;
-                }
             }
             return null;
         }

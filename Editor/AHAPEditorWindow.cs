@@ -32,7 +32,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         float _time, _zoom, _plotHeightOffset;
         Vector2 _plotScreenSize, _plotScrollSize, _scrollPosition;
         EventType _previousMouseState = EventType.MouseUp;
-        MouseLocation _mouseLocation, _mouseClickLocation, _selectedPointLocation;
+        MouseLocation _mouseLocation, _mouseClickLocation, _selectedPointsLocation;
         Vector2 _mouseClickPosition, _mouseClickPlotPosition;
         EventPoint _hoverPoint, _draggedPoint;
         VibrationEvent _hoverPointEvent, _draggedPointEvent;
@@ -107,8 +107,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Rect plotAreaRect = new(bottomPartRect.position, new Vector2(plotAreaWidth, bottomPartRect.height));
 
             float pointEditAreaWidth = Mathf.Max(bottomPartRect.width - plotAreaWidth - lineDoubleSpacing, 0);
-            Rect pointEditAreaRect = new(bottomPartRect.position + new Vector2(plotAreaWidth + lineDoubleSpacing, 0),
-                new Vector2(pointEditAreaWidth, bottomPartHeight));
+            Rect pointEditAreaRect = new(bottomPartRect.x + plotAreaWidth + lineDoubleSpacing,
+                bottomPartRect.y, pointEditAreaWidth, bottomPartHeight);
 
             Rect resizeBarRect = new(plotAreaRect.xMax, plotAreaRect.y + PLOT_BORDER_WIDTH,
                 lineDoubleSpacing * 2f, plotAreaRect.height - 2 * PLOT_BORDER_WIDTH);
@@ -195,13 +195,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 currentEvent.Use();
             }
 
-            bool mouseOnWindow = mouseOverWindow == this;
-            Vector2 plotRectMousePosition = Vector2.zero; // Mouse position inside plot rect mouse is over
-            Vector2 plotPosition = Vector2.zero; // Mouse position in plot space with snapping
+            // Mouse location
+            Vector2 plotPosition = Vector2.positiveInfinity; // Mouse position in plot space with snapping
             Rect mousePlotRect = intensityPlotRect; // Plot rect mouse is on
             Rect otherPlotRect = sharpnessPlotRect; // The other plot rect
             _mouseLocation = MouseLocation.Outside;
-            if (mouseOnWindow)
+            if (mouseOverWindow == this)
             {
                 if (intensityPlotRect.Contains(currentEvent.mousePosition))
                 {
@@ -217,7 +216,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             if (_mouseLocation != MouseLocation.Outside)
             {
-                plotRectMousePosition = currentEvent.mousePosition - mousePlotRect.position;
+                Vector2 plotRectMousePosition = currentEvent.mousePosition - mousePlotRect.position; // Position inside plot rect mouse is over
                 plotPosition.x = (_scrollPosition.x + plotRectMousePosition.x) / _plotScrollSize.x * _time;
                 plotPosition.y = (_plotScreenSize.y - plotRectMousePosition.y) / _plotScreenSize.y;
                 if (_snapMode != SnapMode.None)
@@ -226,15 +225,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     plotPosition.y = (float)Math.Round(plotPosition.y, (int)_snapMode);
                 }
 
-                _hoverPoint = _draggedPoint ?? GetEventPointOnPosition(plotPosition, _mouseLocation, out _hoverPointEvent);
+                _hoverPoint = _selectingPoints ? null : _draggedPoint ?? GetPointOnPosition(plotPosition, _mouseLocation);
 
                 if (currentEvent.button == (int)MouseButton.Left) // LMB event
                 {
-                    if (_hoverPoint == null) // Not hovering over point
+                    if (_hoverPoint == null || currentEvent.control) // Not hovering over point
                     {
                         if (_previousMouseState == EventType.MouseUp && currentEvent.type == EventType.MouseDown) // LMB down
                         {
-                            _selectedPoints.Clear();
+                            //_selectedPoints.Clear();
                             _mouseClickPosition = currentEvent.mousePosition;
                             _mouseClickLocation = _mouseLocation;
                             _mouseClickPlotPosition = plotPosition;
@@ -275,12 +274,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         //_selectedPoints.Clear();
                         _previousMouseState = EventType.MouseDown;
                         _draggedPoint = _hoverPoint;
-                        _draggedPointEvent = _hoverPointEvent;
                         _dragMin = _scrollPosition.x / _plotScrollSize.x * _time + NEIGHBOURING_POINT_OFFSET;
                         _dragMax = (_scrollPosition.x + _plotScreenSize.x) / _plotScrollSize.x * _time - NEIGHBOURING_POINT_OFFSET;
                         _mouseClickLocation = _mouseLocation;
 
-                        if (_draggedPointEvent is ContinuousEvent continuousEvent)
+                        if (_draggedPoint.ParentEvent is ContinuousEvent continuousEvent)
                         {
                             var curve = _mouseLocation == MouseLocation.IntensityPlot ? continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
                             if (_draggedPoint == curve[0])
@@ -312,11 +310,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                                 _draggedPoint.Time = Mathf.Clamp(plotPosition.x, _dragMin, _dragMax);
                             if (_pointDragMode != PointDragMode.LockValue && !currentEvent.shift)
                                 _draggedPoint.Value = Mathf.Clamp(plotPosition.y, 0, 1);
-                            if (_draggedPointEvent is TransientEvent te)
+                            if (_draggedPoint.ParentEvent is TransientEvent te)
                             {
                                 te.Intensity.Time = te.Sharpness.Time = _draggedPoint.Time;
                             }
-                            else if (_draggedPointEvent is ContinuousEvent ce)
+                            else if (_draggedPoint.ParentEvent is ContinuousEvent ce)
                             {
                                 if (_draggedPoint == ce.IntensityCurve.First() || _draggedPoint == ce.SharpnessCurve.First())
                                     ce.IntensityCurve.First().Time = ce.SharpnessCurve.First().Time = _draggedPoint.Time;
@@ -328,30 +326,29 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     }
                 }
                 else if (currentEvent.type == EventType.MouseUp && _hoverPoint != null &&
-                    ((currentEvent.button == (int)MouseButton.Right && _hoverPointEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, _mouseLocation)) ||
+                    ((currentEvent.button == (int)MouseButton.Right && 
+                        _hoverPoint.ParentEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, _mouseLocation)) ||
                     currentEvent.button == (int)MouseButton.Middle)) // Delete point
                 {
-                    if (_selectedPoints.Count > 0 && _selectedPoints[0] == _hoverPoint)
-                        _selectedPoints.Remove(_hoverPoint);
-                    _events.Remove(_hoverPointEvent);
+                    //if (_selectedPoints.Count > 0 && _selectedPoints[0] == _hoverPoint)
+                    //    _selectedPoints.Remove(_hoverPoint);
+                    _events.Remove(_hoverPoint.ParentEvent);
                     _hoverPoint = null;
-                    _hoverPointEvent = null;
                 }
             }
             if (currentEvent.button == (int)MouseButton.Left && currentEvent.type == EventType.MouseUp)
             {
-                if (_draggedPoint != null && !_selectedPoints.Contains(_draggedPoint))
-                {
-                    _selectedPoints.Add(_draggedPoint);
-                    _selectedPointLocation = _mouseLocation;
-                }
+                //if (_draggedPoint != null && !_selectedPoints.Contains(_draggedPoint))
+                //{
+                //    //_selectedPoints.Add(_draggedPoint);
+                //    _selectedPoints.Insert(0, _draggedPoint);
+                //    _selectedPointsLocation = _mouseLocation;
+                //}
                 _draggedPoint = null;
-                _draggedPointEvent = null;
                 _previousMouseState = EventType.MouseUp;
                 if (_mouseLocation == MouseLocation.Outside)
                 {
                     _hoverPoint = null;
-                    _hoverPointEvent = null;
                 }
                 _pointEditAreaResize = false;
             }
@@ -747,7 +744,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 Handles.color = Colors.selectedPoint;
                 highlightSize = SELECT_HIGHLIGHT_SIZE;
-                highlightRect = _selectedPointLocation == MouseLocation.IntensityPlot ? intensityPlotRect : sharpnessPlotRect;
+                highlightRect = _selectedPointsLocation == MouseLocation.IntensityPlot ? intensityPlotRect : sharpnessPlotRect;
                 for (int i = 0; i < _selectedPoints.Count; i++)
                 {
                     Vector3 selectedPointCoords = PointToWindowCoords(_selectedPoints[i], highlightRect);
@@ -780,12 +777,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         float newTime = Mathf.Clamp(EditorGUILayout.FloatField(Content.timeLabel, point.Time), _dragMin, _dragMax);
                         if (EditorGUI.EndChangeCheck())
                         {
-                            GetEventPointOnPosition(point, _selectedPointLocation, out VibrationEvent vibrationEvent);
-                            if (vibrationEvent is TransientEvent transientEvent)
+                            if (point.ParentEvent is TransientEvent transientEvent)
                             {
                                 transientEvent.Sharpness.Time = transientEvent.Intensity.Time = newTime;
                             }
-                            else if (vibrationEvent is ContinuousEvent continuousEvent)
+                            else if (point.ParentEvent is ContinuousEvent continuousEvent)
                             {
                                 if (point.Time == continuousEvent.IntensityCurve.First().Time || point.Time == continuousEvent.SharpnessCurve.First().Time)
                                     continuousEvent.IntensityCurve.First().Time = continuousEvent.SharpnessCurve.First().Time = newTime;
@@ -796,7 +792,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             }
                         }
                         point.Value = Mathf.Clamp01(EditorGUILayout.FloatField(
-                            _selectedPointLocation == MouseLocation.IntensityPlot ? Content.intensityLabel : Content.sharpnessLabel,
+                            _selectedPointsLocation == MouseLocation.IntensityPlot ? Content.intensityLabel : Content.sharpnessLabel,
                             point.Value));
                         EditorGUIUtility.labelWidth = 0;
                     }
@@ -842,7 +838,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #endregion
 
-            if (mouseOnWindow)
+            if (mouseOverWindow == this)
                 Repaint();
         }
     }

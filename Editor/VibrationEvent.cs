@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -6,7 +7,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     internal enum MouseLocation { Outside = 0, IntensityPlot = 1, SharpnessPlot = 2 }
 
-    internal class EventPoint
+    internal class EventPoint : IComparable<EventPoint>
     {
         public float Time;
         public float Value;
@@ -19,14 +20,28 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             ParentEvent = parent;
         }
 
+        public int CompareTo(EventPoint other)
+        {
+            if (Time < other.Time) return -1;
+            if (Time == other.Time) return 0;
+            return 1;
+        }
+
         //public static implicit operator EventPoint(Vector2 v2) => new EventPoint(v2.x, v2.y);
 
         public static implicit operator Vector2(EventPoint point) => new Vector2(point.Time, point.Value);
     }
 
-    internal abstract class VibrationEvent
+    internal abstract class VibrationEvent : IComparable<VibrationEvent>
     {
         public abstract float Time { get; }
+
+        public int CompareTo(VibrationEvent other)
+        {
+            if (Time < other.Time) return -1;
+            if (Time == other.Time) return 0;
+            return 1;
+        }
 
         public abstract bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint);
 

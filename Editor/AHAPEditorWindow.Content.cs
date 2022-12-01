@@ -13,7 +13,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float MAX_ZOOM = 7f;
         const float SCROLL_INCREMENT = 0.05f;
         const float HOVER_HIGHLIGHT_SIZE = 9f;
-        const float DRAG_HIGHLIGHT_SIZE = 13f;
+        const float DRAG_HIGHLIGHT_SIZE = 15f;
         const float SELECT_HIGHLIGHT_SIZE = 12f;
         const float HOVER_DOT_SIZE = 3f;
         const float PLOT_EVENT_POINT_SIZE = 5f;

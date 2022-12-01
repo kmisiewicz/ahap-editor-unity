@@ -42,6 +42,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private void HandleImport()
         {
+            _selectedPoints.Clear();
             if (_ahapFile != null)
             {
                 AHAPFile ahap;

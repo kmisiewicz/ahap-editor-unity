@@ -306,8 +306,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         }
                         else if (_previousMouseState == EventType.MouseDown && _currentEvent.type == EventType.MouseDrag)
                             _previousMouseState = EventType.MouseDrag;
-                        else if (_currentEvent.type == EventType.MouseUp && _mouseClickLocation == _mouseLocation)
-                            HandleSelection();
+                        else if (_currentEvent.type == EventType.MouseUp)
+                        {
+                            _selectingPoints = false;
+                            _previousMouseState = EventType.MouseUp;
+                            if (_mouseClickLocation == _mouseLocation)
+                                HandleSelection();
+                        }
                     }
                     else if (_hoverPoint != null && _currentEvent.button == (int)MouseButton.Middle && _currentEvent.type == EventType.MouseUp)
                     {
@@ -665,7 +670,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             Mathf.Min(_mouseClickPosition.y, windowMousePositionProcessed.y),
                             Mathf.Abs(_mouseClickPosition.x - windowMousePositionProcessed.x),
                             Mathf.Abs(_mouseClickPosition.y - windowMousePositionProcessed.y));
-                        EditorUtils.DrawRectWithBorder(selectionRect, 2, Colors.draggedPoint, Colors.plotBorder);
+                        EditorUtils.DrawRectWithBorder(selectionRect, lineDoubleSpacing, Colors.selectedPoint, Colors.selectionRectBorder);
                     }
                     else
                     {
@@ -686,6 +691,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 Handles.color = Colors.draggedPoint;
                 Rect dragRect = _mouseClickLocation == MouseLocation.IntensityPlot ? intensityPlotRect : sharpnessPlotRect;
                 Handles.DrawSolidDisc(PointToWindowCoords(_draggedPoint, dragRect), POINT_NORMAL, DRAG_HIGHLIGHT_SIZE);
+                Handles.color = Colors.dragBounds;
+                Vector3 minBound = PointToWindowCoords(new Vector2(_dragMinBound, 1), intensityPlotRect);
+                Vector3 minBound2 = PointToWindowCoords(new Vector2(_dragMinBound, 0), intensityPlotRect);
+                Vector3 maxBound = PointToWindowCoords(new Vector2(_dragMaxBound, 1), intensityPlotRect);
+                Vector3 maxBound2 = PointToWindowCoords(new Vector2(_dragMaxBound, 0), intensityPlotRect);
+                Handles.DrawDottedLine(minBound, minBound2, 1);
+                Handles.DrawDottedLine(maxBound, maxBound2, 1);
+                minBound.y += _plotHeightOffset;
+                minBound2.y += _plotHeightOffset;
+                maxBound.y += _plotHeightOffset;
+                maxBound2.y += _plotHeightOffset;
+                Handles.DrawDottedLine(minBound, minBound2, 1);
+                Handles.DrawDottedLine(maxBound, maxBound2, 1);
             }
             else if (_hoverPoint != null && _mouseLocation != MouseLocation.Outside)
             {

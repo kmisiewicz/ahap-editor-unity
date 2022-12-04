@@ -48,19 +48,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private bool IsTimeInView(float time)
         {
-            float scrollTime = time / this._time * _plotScrollSize.x;
+            float scrollTime = time / _time * _plotScrollSize.x;
             return scrollTime >= _scrollPosition.x && scrollTime <= _scrollPosition.x + _plotScreenSize.x;
         }
 
         private Vector3 PointToScrollCoords(float time, float value, float heightOffset = 0)
         {
-            return new Vector3(time / this._time * _plotScrollSize.x,
+            return new Vector3(time / _time * _plotScrollSize.x,
                 _plotScreenSize.y - value * _plotScreenSize.y + heightOffset);
         }
 
         private Vector3 PointToWindowCoords(EventPoint point, Rect plotRect)
         {
-            return new Vector3(plotRect.x + point.Time / this._time * _plotScrollSize.x - _scrollPosition.x,
+            return new Vector3(plotRect.x + point.Time / _time * _plotScrollSize.x - _scrollPosition.x,
                 plotRect.y + plotRect.height - point.Value * plotRect.height);
         }
 
@@ -158,8 +158,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             EventPoint cePoint = null;
             foreach (var point in _selectedPoints)
             {
-                if (cePoint == null && point.ParentEvent is ContinuousEvent)
-                    cePoint = point;
+                if (point.ParentEvent is ContinuousEvent ce)
+                {
+                    cePoint ??= point;
+
+                    (List<EventPoint> dragCurve, List<EventPoint> otherCurve) = _mouseLocation == MouseLocation.IntensityPlot ?
+                        (ce.IntensityCurve, ce.SharpnessCurve) : (ce.SharpnessCurve, ce.IntensityCurve);
+                    if (point == dragCurve[0])
+                    {
+                        var nextPoint = otherCurve.Find(p => p.Time > cePoint.Time);
+                        if (nextPoint != null) _dragMax = Mathf.Min(_dragMax, nextPoint.Time - NEIGHBOURING_POINT_OFFSET - cePoint.Time);
+                    }
+                    else if (point == dragCurve.Last())
+                    {
+                        var previousPoint = otherCurve.FindLast(p => p.Time < point.Time);
+                        if (previousPoint != null) _dragMin = Mathf.Max(_dragMin, previousPoint.Time + NEIGHBOURING_POINT_OFFSET - point.Time);
+                    }
+                }
 
                 _dragValueMin = Mathf.Min(_dragValueMin, point.Value);
                 _dragValueMax = Mathf.Max(_dragValueMax, point.Value);
@@ -182,11 +197,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     var previousPoint = dragCurve.FindLast(p => p.Time < cePoint.Time);
                     if (previousPoint != null) _dragMin = Mathf.Max(_dragMin, previousPoint.Time + NEIGHBOURING_POINT_OFFSET - cePoint.Time);
-                    if (cePoint == dragCurve.Last())
-                    {
-                        previousPoint = otherCurve.FindLast(p => p.Time < cePoint.Time);
-                        if (previousPoint != null) _dragMin = Mathf.Max(_dragMin, previousPoint.Time + NEIGHBOURING_POINT_OFFSET - cePoint.Time);
-                    }
                 }
 
                 for (int i = _selectedPoints.Count - 1; i >= 0; i--)
@@ -205,15 +215,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         {
                             var nextPoint = dragCurve.Find(p => p.Time > cePoint.Time);
                             if (nextPoint != null) _dragMax = Mathf.Min(_dragMax, nextPoint.Time - NEIGHBOURING_POINT_OFFSET - cePoint.Time);
-                            if (cePoint == dragCurve[0])
-                            {
-                                nextPoint = otherCurve.Find(p => p.Time > cePoint.Time);
-                                if (nextPoint != null) _dragMax = Mathf.Min(_dragMax, nextPoint.Time - NEIGHBOURING_POINT_OFFSET - cePoint.Time);
-                            }
                         }
                         break;
                     }
                 }
+
+                _dragMinBound = _selectedPoints[0].Time + _dragMin;
+                _dragMaxBound = _selectedPoints[^1].Time + _dragMax;
             }
         }
 
@@ -306,9 +314,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
             }
             _selectedPoints.Sort();
-
-            _selectingPoints = false;
-            _previousMouseState = EventType.MouseUp;
             _selectedPointsLocation = _mouseClickLocation;
         }
 

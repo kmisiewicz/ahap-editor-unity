@@ -41,9 +41,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly Color eventContinuous = new(1f, 0.6f, 0.2f);
             public static readonly Color eventContinuousCreation = new(1f, 0.6f, 0.2f, 0.5f);
             public static readonly Color hoverPoint = new(0.8f, 0.8f, 0.8f, 0.2f);
-            public static readonly Color draggedPoint = new(0.5f, 1f, 1f, 0.3f);
-            public static readonly Color selectedPoint = new(1f, 1f, 0f, 0.3f);
+            public static readonly Color draggedPoint = new(1f, 1f, 0f, 0.3f);
+            public static readonly Color dragBounds = new(0.85f, 1f, 0f);
+            public static readonly Color selectedPoint = new(0.5f, 1f, 1f, 0.3f);
             public static readonly Color hoverGuides = new(0.7f, 0f, 0f);
+            public static readonly Color selectionRectBorder = new(0, 0.9f, 0.9f);
         }
 
         class Content

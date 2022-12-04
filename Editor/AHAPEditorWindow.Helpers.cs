@@ -147,8 +147,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _mouseClickLocation = _mouseLocation;
             _mouseClickPlotPosition = _draggedPoint;
 
-            _dragMin = _scrollPosition.x / _plotScrollSize.x * _time + NEIGHBOURING_POINT_OFFSET - _draggedPoint.Time;
-            _dragMax = (_scrollPosition.x + _plotScreenSize.x) / _plotScrollSize.x * _time - NEIGHBOURING_POINT_OFFSET - _draggedPoint.Time;
+            _dragMin = _scrollPosition.x / _plotScrollSize.x * _time + NEIGHBOURING_POINT_OFFSET - _selectedPoints[0].Time;
+            _dragMax = (_scrollPosition.x + _plotScreenSize.x) / _plotScrollSize.x * _time - NEIGHBOURING_POINT_OFFSET - _selectedPoints[^1].Time;
             _dragValueMin = 1;
             _dragValueMax = 0;
 
@@ -169,7 +169,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 var ce = (ContinuousEvent)cePoint.ParentEvent;
                 (List<EventPoint> dragCurve, List<EventPoint> otherCurve) = _mouseLocation == MouseLocation.IntensityPlot ?
                     (ce.IntensityCurve, ce.SharpnessCurve) : (ce.SharpnessCurve, ce.IntensityCurve);
-                var curve = _mouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
                 if (cePoint == dragCurve[0])
                 {
                     var previousEvent = _events.FindLast(ev => ev.Time < cePoint.Time && ev is ContinuousEvent);

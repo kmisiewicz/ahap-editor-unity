@@ -308,5 +308,18 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _previousMouseState = EventType.MouseUp;
             _selectedPointsLocation = _mouseClickLocation;
         }
+
+        private void SelectHoverEvent()
+        {
+            _selectedPoints.Clear();
+            if (_hoverPoint.ParentEvent is TransientEvent)
+                _selectedPoints.Add(_hoverPoint);
+            else if (_hoverPoint.ParentEvent is ContinuousEvent ce)
+            {
+                var curve = _mouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
+                _selectedPoints.AddRange(curve);
+            }
+            _selectedPointsLocation = _mouseLocation;
+        }
     }
 }

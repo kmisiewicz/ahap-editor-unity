@@ -295,6 +295,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (_mouseLocation != MouseLocation.Outside)
                 {
+                    if (_previousMouseState == EventType.MouseUp)
+                        _hoverPoint = GetPointOnPosition(_mousePlotPosition, _mouseLocation);
                     if (_currentEvent.button == (int)MouseButton.Left)
                     {
                         if (_previousMouseState == EventType.MouseUp && _currentEvent.type == EventType.MouseDown)
@@ -306,6 +308,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             _previousMouseState = EventType.MouseDrag;
                         else if (_currentEvent.type == EventType.MouseUp && _mouseClickLocation == _mouseLocation)
                             HandleSelection();
+                    }
+                    else if (_hoverPoint != null && _currentEvent.button == (int)MouseButton.Middle && _currentEvent.type == EventType.MouseUp)
+                    {
+                        SelectHoverEvent();
                     }
                 }
             }

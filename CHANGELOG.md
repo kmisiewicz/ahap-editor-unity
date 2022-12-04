@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2022-12-04
+### Added
+- Point selection - switch mode in top bar or hold *Ctrl* to select multiple points
+- You can now drag multiple selected points, limits are visualised with yellow dotted lines, middle mouse button selects whole event if hovering over a point
+- *Point editing* section in top bar UI contains *Advanced panel* toggle which enables resizable side panel with additional options and information:
+	- Selected point info (shows parameters of single selected point)
+	- Point drag mode (lock time or value - doubles holding *Shift* or *Alt* key
+	- Mouse snapping
+	- Hover info (missing in previous version)
+- Time can now be locked during continuous event creation
+- Draw culling - points that are not invisible in scroll view are not being drawn
+- Window context menu contains debug mode switch and *Reset* button that should fix potential issues without the need to reopen the window
+- When trying to use an audio file longer than 30 seconds (*MAX_TIME*) a warning dialog is displayed
+
+### Changed
+- Reference audio texture is now showing only positive amplitude to better reflect how the vibration parameters should be setup
+- Swapped *Shift* and *Alt* key to lock time and value accordingly
+- Re-writted mouse handling so different functionalities can be used in various mouse modes
+- Split code into more files
+
+### Fixed
+- Guide lines are now properly following selected snapping setting
+- Waveform texture is now scaling correctly
+
+
 ## [0.3.0] - 2022-09-18
 ### Added
 - Sample with a script to test vibrations on gamepad via Nice Vibrations
@@ -19,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plot X axis first and labels are now in correct positions
 - Audio waveform is now drawn under horizontal grid lines
 
+
 ## [0.2.2] - 2022-08-21
 ### Added
 - Waveform scale parameter
@@ -29,11 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Moved plot event help classes to separate file
   - Added global parameters on top of the file for easier settings adjustments
 
+
 ## [0.2.1] - 2022-07-23
 ### Fixed
 - Importing file with a single point curve where point overlaps with last point of previous curve won't result in infinite loop/memory leak
 - Exporting events with curves with multiples of 16 points won't create unnecessary parameter curve with a single point
 - Removed unwanted logs used for hover detection fix in version 0.2.0
+
 
 ## [0.2.0] - 2022-07-19
 ### Added
@@ -42,10 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Hover detection for transient event
 
+
 ## [0.1.1] - 2022-07-18
 ### Changed
 - Added more vertical guide lines on plots
 - Minor code optimizations
+
 
 ## [0.1.0] - 2022-07-17
 ### Initial release

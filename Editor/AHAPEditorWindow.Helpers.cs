@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
 
@@ -12,6 +10,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
     {
         public void AddItemsToMenu(GenericMenu menu)
         {
+            menu.AddItem(Content.resetLabel, false, () => ResetState());
+            menu.AddSeparator("");
             menu.AddItem(Content.debugModeLabel, DebugMode, () => DebugMode = !DebugMode);
         }
 
@@ -32,13 +32,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _waveformClip = null;
             _waveformRenderScale = _waveformLastPaintedZoom = 1f;
             _waveformVisible = _waveformNormalize = _waveformShouldRepaint = false;
+            _pointDragMode = PointDragMode.FreeMove;
             _pointDragModes = Enum.GetNames(typeof(PointDragMode));
             for (int i = 0; i < _pointDragModes.Length; i++)
                 _pointDragModes[i] = string.Concat(_pointDragModes[i].Select(x => char.IsUpper(x) ? $" {x}" : x.ToString())).TrimStart(' ');
+            _mouseMode = MouseMode.AddRemove;
+            _mouseModes = Enum.GetNames(typeof(MouseMode));
             _plotAreaWidthFactor = PLOT_AREA_BASE_WIDTH;
             _pointEditAreaVisible = false;
-            _mouseMode = MouseMode.AddRemove;
             _currentEvent = null;
+            _selectedPoints.Clear();
 
             DebugMode = false;
         }

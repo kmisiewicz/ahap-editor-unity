@@ -23,7 +23,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         enum MouseButton { Left = 0, Right = 1, Middle = 2 }
 
-        enum MouseMode { None = 0, AddRemove = 1, Select = 2 }
+        enum MouseMode { AddRemove = 0, Select = 1, None = -1 }
 
         // Data
         TextAsset _ahapFile;
@@ -37,12 +37,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         MouseLocation _mouseLocation, _mouseClickLocation, _selectedPointsLocation;
         Vector2 _mousePlotPosition, _mouseClickPosition, _mouseClickPlotPosition;
         EventPoint _hoverPoint, _draggedPoint;
-        VibrationEvent _hoverPointEvent, _draggedPointEvent;
         List<EventPoint> _selectedPoints;
         bool _selectingPoints;
         float _dragMin, _dragMax;
         float _dragValueMin, _dragValueMax;
-        string[] _pointDragModes;
+        float _dragMinBound, _dragMaxBound;
+        string[] _pointDragModes, _mouseModes;
         PointDragMode _pointDragMode = PointDragMode.FreeMove;
         SnapMode _snapMode = SnapMode.None;
         bool _pointEditAreaVisible, _pointEditAreaResize;
@@ -452,7 +452,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             {
                 EditorGUILayout.LabelField(Content.plotViewLabel, EditorStyles.boldLabel);
-
                 GUILayout.Space(-1);
 
                 GUILayout.BeginHorizontal();
@@ -481,16 +480,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             {
                 EditorGUILayout.LabelField(Content.pointEditingLabel, EditorStyles.boldLabel);
-
                 GUILayout.Space(-1);
 
-                _pointDragMode = (PointDragMode)GUILayout.Toolbar((int)_pointDragMode, _pointDragModes);
+                _mouseMode = (MouseMode)(GUILayout.Toolbar((int)_mouseMode, _mouseModes[..^1]));
 
-                _pointEditAreaVisible = GUILayout.Toggle(_pointEditAreaVisible, Content.advancedPanelLabel, GUI.skin.button);
-
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.snappingLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
-                _snapMode = (SnapMode)EditorGUILayout.EnumPopup(Content.snappingLabel, _snapMode);
-                EditorGUIUtility.labelWidth = 0;
+                _pointEditAreaVisible = GUILayout.Toggle(_pointEditAreaVisible, Content.advancedPanelLabel, GUI.skin.button, GUILayout.ExpandHeight(true));
             }
             GUILayout.EndVertical();
 
@@ -760,6 +754,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         if (_selectedPoints.Count > 1) GUILayout.Label("Multiple points\nselected", Styles.xAxisLabelStyle);
                         else GUILayout.Label("No\nselection", Styles.xAxisLabelStyle);
                     }
+                    GUILayout.Space(3);
+                }
+                GUILayout.EndVertical();
+
+                // Point drag mode
+                GUILayout.BeginVertical(GUI.skin.box);
+                {
+                    EditorGUILayout.LabelField(Content.pointDragLabel, EditorStyles.boldLabel);
+                    _pointDragMode = (PointDragMode)GUILayout.Toolbar((int)_pointDragMode, _pointDragModes);
+                    GUILayout.Space(3);
+                }
+                GUILayout.EndVertical();
+                
+                // Snapping
+                GUILayout.BeginVertical(GUI.skin.box);
+                {
+                    EditorGUILayout.LabelField(Content.snappingLabel, EditorStyles.boldLabel);
+                    _snapMode = (SnapMode)EditorGUILayout.EnumPopup(GUIContent.none, _snapMode);
                     GUILayout.Space(3);
                 }
                 GUILayout.EndVertical();

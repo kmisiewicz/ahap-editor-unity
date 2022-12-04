@@ -23,9 +23,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float MIN_WAVEFORM_RENDER_SCALE = 0.1f;
         const float MAX_WAVEFORM_RENDER_SCALE = 2f;
         const float CUSTOM_LABEL_WIDTH_OFFSET = 3;
-        const float PLOT_AREA_BASE_WIDTH = 0.85f;
-        const float PLOT_AREA_MIN_WIDTH = 0.5f;
-        const float PLOT_AREA_MAX_WIDTH = 0.9f;
+        const float PLOT_AREA_BASE_WIDTH = 0.80f;
+        const float PLOT_AREA_MIN_WIDTH = 0.55f;
+        const float PLOT_AREA_MAX_WIDTH = 0.86f;
         const float TOP_BAR_OPTIONS_SIZE_FACTOR = 0.12f * 16 / 9;
 
         static readonly Vector3 POINT_NORMAL = new(0, 0, 1);
@@ -84,6 +84,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent hoverInfoLabel = new("Hover info");
             public static readonly GUIContent plotLabel = new("Plot");
             public static readonly GUIContent valueLabel = new("Value");
+            public static readonly GUIContent resetLabel = new("Reset");
+            public static readonly GUIContent pointDragLabel = new("Point Drag Mode");
         }
 
         class Styles

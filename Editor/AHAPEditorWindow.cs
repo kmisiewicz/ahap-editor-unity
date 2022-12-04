@@ -285,6 +285,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 if (_currentEvent.button == (int)MouseButton.Left && _currentEvent.type == EventType.MouseUp)
                 {
+                    if (_draggedPoint != null)
+                    {
+                        ContinuousEvent lastSortedEvent = null;
+                        foreach (var point in _selectedPoints)
+                        {
+                            if (point.ParentEvent is ContinuousEvent ce && ce != lastSortedEvent)
+                            {
+                                lastSortedEvent = ce;
+                                lastSortedEvent.IntensityCurve.Sort();
+                                lastSortedEvent.SharpnessCurve.Sort();
+                            }
+                        }
+                    }
                     _draggedPoint = null;
                     _previousMouseState = EventType.MouseUp;
                     if (_mouseLocation == MouseLocation.Outside)

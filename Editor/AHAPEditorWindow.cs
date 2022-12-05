@@ -75,7 +75,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [MenuItem("Window/AHAP Editor")]
         public static void OpenWindow()
         {
-            AHAPEditorWindow window = GetWindow<AHAPEditorWindow>(Content.WINDOW_NAME);
+            AHAPEditorWindow window = GetWindow<AHAPEditorWindow>(Content.WINDOW_NAME, typeof(SceneView));
             var content = EditorGUIUtility.IconContent(Content.WINDOW_ICON_NAME);
             content.text = Content.WINDOW_NAME;
             window.titleContent = content;

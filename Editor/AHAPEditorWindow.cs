@@ -9,21 +9,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     public partial class AHAPEditorWindow : EditorWindow
     {
-        #region Types, defines and variables
-
-        enum SnapMode
-        {
-            None = 0,
-            [InspectorName("0.1")] Tenth = 1,
-            [InspectorName("0.01")] Hundredth = 2,
-            [InspectorName("0.001")] Thousandth = 3
-        }
-
-        enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
-
-        enum MouseButton { Left = 0, Right = 1, Middle = 2 }
-
-        enum MouseMode { AddRemove = 0, Select = 1, None = -1 }
+        #region Fields
 
         // Data
         TextAsset _ahapFile;
@@ -33,22 +19,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         // Drawing
         float _time, _zoom, _plotHeightOffset;
         Vector2 _plotScreenSize, _plotScrollSize, _scrollPosition;
+        bool _pointEditAreaVisible;
+        float _plotAreaWidthFactor, _plotAreaWidthFactorOffset;
+        string[] _pointDragModes, _mouseModes;
+
+        // Mouse handling
+        UnityEngine.Event _currentEvent;
         EventType _previousMouseState = EventType.MouseUp;
         MouseLocation _mouseLocation, _mouseClickLocation, _selectedPointsLocation;
         Vector2 _mousePlotPosition, _mouseClickPosition, _mouseClickPlotPosition;
-        EventPoint _hoverPoint, _draggedPoint;
-        List<EventPoint> _selectedPoints;
-        bool _selectingPoints;
-        float _dragMin, _dragMax;
-        float _dragValueMin, _dragValueMax;
-        float _dragMinBound, _dragMaxBound;
-        string[] _pointDragModes, _mouseModes;
         PointDragMode _pointDragMode = PointDragMode.FreeMove;
         SnapMode _snapMode = SnapMode.None;
-        bool _pointEditAreaVisible, _pointEditAreaResize;
-        float _plotAreaWidthFactor, _plotAreaWidthFactorOffset;
         MouseMode _mouseMode;
-        UnityEngine.Event _currentEvent;
+        EventPoint _hoverPoint, _draggedPoint;
+        List<EventPoint> _selectedPoints;
+        bool _selectingPoints, _pointEditAreaResize;
+        float _dragMin, _dragMax, _dragValueMin, _dragValueMax, _dragMinBound, _dragMaxBound;
                 
         // Audio waveform
         AudioClip _waveformClip;
@@ -232,7 +218,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             MouseMode actualMouseMode = _mouseMode;
-            if (_pointEditAreaResize) actualMouseMode = MouseMode.None;
+            if (_pointEditAreaResize) 
+                actualMouseMode = MouseMode.None;
             else if (actualMouseMode == MouseMode.AddRemove && (_selectingPoints || 
                 _previousMouseState != EventType.MouseDrag && _currentEvent.control))
                 actualMouseMode = MouseMode.Select;

@@ -56,7 +56,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             public static readonly GUIContent debugModeLabel = new("Debug Mode");
             public static readonly GUIContent debugLabel = new("Debug");
-            public static readonly GUIContent logRectsLabel = new("Log rects");
+            public static readonly GUIContent logRectsLabel = new("Log Rects");
             public static readonly GUIContent drawRectsLabel = new("Draw Rects");
             public static readonly GUIContent fileLabel = new("File");
             public static readonly GUIContent importLabel = new("Import");
@@ -96,5 +96,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };
             public static readonly GUIStyle xAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
         }
+
+        enum SnapMode
+        {
+            None = 0,
+            [InspectorName("0.1")] Tenth = 1,
+            [InspectorName("0.01")] Hundredth = 2,
+            [InspectorName("0.001")] Thousandth = 3
+        }
+
+        enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
+
+        enum MouseButton { Left = 0, Right = 1, Middle = 2 }
+
+        enum MouseMode { AddRemove = 0, Select = 1, None = -1 }
     }
 }

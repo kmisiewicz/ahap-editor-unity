@@ -1,6 +1,6 @@
 {
 	"name": "com.chroma.ahapeditor",
-	"version": "0.4.0",
+	"version": "0.4.1",
 	"displayName": "AHAP Editor",
 	"description": "This package contains an editor window script allowing to edit advanced haptic patterns.",
 	"unity": "2021.3",

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2022-12-08
+### Changed
+- AHAP editor window will now auto-dock next to scene view
+
+### Fixed
+- Changed package assembly definition to be only included in editor, so it won't try to compile into builds (and miserably fail)
+
+
 ## [0.4.0] - 2022-12-04
 ### Added
 - Point selection - switch mode in top bar or hold *Ctrl* to select multiple points

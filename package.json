@@ -22,6 +22,11 @@
 			"displayName": "Nice Vibrations Rumble Tester",
 			"description": "For owners of Nice Vibrations 3.9. Contains a scene to test advanced haptic patterns converted to rumble waveforms in editor with a gamepad. Requires Input System package.",
 			"path": "Samples~/NiceVibrationsRumbleTester"
+		},
+		{
+			"displayName": "QR Code Generator",
+			"description": "For testing on mobile with companion app.",
+			"path": "Samples~/QRCodeGenerator"
 		}
 	]
 }

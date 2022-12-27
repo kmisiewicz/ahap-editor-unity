@@ -75,6 +75,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         
         private void OnGUI()
 		{
+            _currentEvent = UnityEngine.Event.current;
+
             #region Size and positions calculations
 
             float lineHeight = EditorGUIUtility.singleLineHeight;
@@ -127,6 +129,33 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 plotAreaRect.width - plotOffsetLeftTop.x - plotOffsetRightBottom.x,
                 plotAreaRect.height - plotOffsetLeftTop.y - lineDoubleSpacing);
             _plotScrollSize = new Vector2(scrollRect.width * _zoom, intensityPlotRect.height);
+
+            #region Zoom and scroll (mouse wheel)
+
+            if (_currentEvent.type == EventType.ScrollWheel && plotAreaRect.Contains(_currentEvent.mousePosition))
+            {
+                if (_currentEvent.control)
+                {
+                    float plotMouseX = _currentEvent.mousePosition.x - intensityPlotRect.x;
+                    float xOld = (_scrollPosition.x + plotMouseX) / _plotScrollSize.x;
+                    _zoom -= Mathf.Sign(_currentEvent.delta.y) * ZOOM_INCREMENT;
+                    _zoom = Mathf.Clamp(_zoom, 1, MAX_ZOOM);
+                    _plotScrollSize = new Vector2(scrollRect.width * _zoom, intensityPlotRect.height);
+                    float xNew = (_scrollPosition.x + plotMouseX) / _plotScrollSize.x;
+                    float xDiff = (xOld - xNew) * _plotScrollSize.x;
+                    _scrollPosition.x += xDiff;
+                    _scrollPosition.x = Mathf.Clamp(_scrollPosition.x, 0, _plotScrollSize.x - _plotScreenSize.x);
+                }
+                else if (_zoom > 1f)
+                {
+                    _scrollPosition.x += _plotScrollSize.x * Mathf.Sign(_currentEvent.delta.y) * SCROLL_INCREMENT;
+                    _scrollPosition.x = Mathf.Clamp(_scrollPosition.x, 0, _plotScrollSize.x - _plotScreenSize.x);
+                }
+                _currentEvent.Use();
+            }
+
+            #endregion
+
             Rect scrollPlotRect = new(Vector2.zero, _plotScrollSize);
             Rect scrollContentRect = new(0, 0, _plotScrollSize.x, scrollRect.height);
 
@@ -166,25 +195,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             #endregion
 
-            #region Mouse handling
-
-            _currentEvent = UnityEngine.Event.current;
-
-            // Zoom and scroll (mouse wheel)
-            if (_currentEvent.type == EventType.ScrollWheel)
-            {
-                if (_currentEvent.control)
-                {
-                    _zoom -= Mathf.Sign(_currentEvent.delta.y) * ZOOM_INCREMENT;
-                    _zoom = Mathf.Clamp(_zoom, 1, MAX_ZOOM);
-                }
-                else if (_zoom > 1f)
-                {
-                    _scrollPosition.x += _plotScrollSize.x * Mathf.Sign(_currentEvent.delta.y) * SCROLL_INCREMENT;
-                    _scrollPosition.x = Mathf.Clamp(_scrollPosition.x, 0, _plotScrollSize.x - _plotScreenSize.x);
-                }
-                _currentEvent.Use();
-            }
+            #region Mouse clicks handling
 
             // Mouse location
             _mousePlotPosition = Vector2.positiveInfinity; // Mouse position in plot space with snapping

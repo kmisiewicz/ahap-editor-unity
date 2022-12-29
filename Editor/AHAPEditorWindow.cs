@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -23,6 +24,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         float _plotAreaWidthFactor, _plotAreaWidthFactorOffset;
         string[] _pointDragModes, _mouseModes;
         bool _safeMode;
+        GenericMenu _importFormatMenu;
 
         // Mouse handling
         UnityEngine.Event _currentEvent;
@@ -102,7 +104,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             sharpnessPlotAreaRect.y += intensityPlotAreaRect.height + lineDoubleSpacing;
 
             Vector2 yAxisLabelSize = EditorStyles.label.CalcSize(Content.yAxisDummyLabel);
-            yAxisLabelSize.x += CUSTOM_LABEL_WIDTH_OFFSET;
+            yAxisLabelSize.x += LABEL_WIDTH_OFFSET;
             yAxisLabelSize.y *= 1.5f;
             Vector2 xAxisLabelSize = EditorStyles.label.CalcSize(Content.xAxisDummyLabel);
             xAxisLabelSize.x *= 1.5f;
@@ -163,7 +165,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float yAxisLabelInterval = 1f / (yAxisLabelCount - 1);
             float yAxisLabelHeightInterval = _plotScreenSize.y / (yAxisLabelCount - 1);
             Rect yAxisLabelRect = new(CONTENT_MARGIN.x, intensityPlotRect.y - lineHalfHeight - lineSpacing,
-                plotOffsetLeftTop.x - CUSTOM_LABEL_WIDTH_OFFSET, lineHeight);
+                plotOffsetLeftTop.x - LABEL_WIDTH_OFFSET, lineHeight);
 
             // Debug
             if (_drawRects)
@@ -397,18 +399,25 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 EditorGUILayout.LabelField(Content.fileLabel, EditorStyles.boldLabel);
 
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.assetLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.assetLabel).x + LABEL_WIDTH_OFFSET;
                 _vibrationAsset = EditorGUILayout.ObjectField(Content.assetLabel, _vibrationAsset, typeof(UnityEngine.Object), false);
                 EditorGUIUtility.labelWidth = 0;
 
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _vibrationAsset != null;
-                if (GUILayout.Button(Content.importLabel)) HandleImport();
+                GUILayout.BeginHorizontal(topBarContainerHalfOption);
+                if (GUILayout.Button(Content.importLabel)) OnImportClicked();
+                GUILayout.Space(-lineSpacing);
+                if (EditorGUILayout.DropdownButton(GUIContent.none, FocusType.Passive, GUILayout.Width(19)))
+                    _importFormatMenu.ShowAsContext();
+                GUILayout.EndHorizontal();
+                GUILayout.Space(10);
                 GUI.enabled = true;
-                if (GUILayout.Button(Content.saveLabel)) HandleSaving();
+                if (GUILayout.Button(Content.saveLabel, topBarContainerHalfOption)) HandleSaving();
+                GUILayout.Space(-lineSpacing);
                 GUILayout.EndHorizontal();
 
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.projectNameLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.projectNameLabel).x + LABEL_WIDTH_OFFSET;
                 _projectName = EditorGUILayout.TextField(Content.projectNameLabel, _projectName);
             }
             GUILayout.EndVertical();
@@ -425,13 +434,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     AudioClipUtils.StopAllClips();
                     _waveformVisible = false;
-                    if (_waveformClip != null) 
+                    if (_waveformClip != null && _waveformClip.length > MAX_TIME)
                     {
-                        if (_waveformClip.length > MAX_TIME)
-                        {
-                            _waveformClip = null;
-                            EditorUtility.DisplayDialog("Clip too long", $"Selected audio clip is longer than max allowed {MAX_TIME}s.", "OK");
-                        }
+                        _waveformClip = null;
+                        EditorUtility.DisplayDialog("Clip too long", $"Selected audio clip is longer than max allowed {MAX_TIME}s.", "OK");
                     }
                 }
                 GUI.enabled = _waveformClip != null;
@@ -450,7 +456,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }                    
                 GUILayout.EndHorizontal();
 
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.renderScaleLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.renderScaleLabel).x + LABEL_WIDTH_OFFSET;
                 _waveformRenderScale = Mathf.Clamp(EditorGUILayout.FloatField(Content.renderScaleLabel, _waveformRenderScale),
                     MIN_WAVEFORM_RENDER_SCALE, MAX_WAVEFORM_RENDER_SCALE);
                 GUI.enabled = true;
@@ -464,14 +470,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 GUILayout.Space(-1);
 
                 GUILayout.BeginHorizontal();
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + LABEL_WIDTH_OFFSET;
                 _zoom = (float)Math.Round(EditorGUILayout.Slider(Content.zoomLabel, _zoom, 1, MAX_ZOOM), 1);
                 if (Mathf.Abs(_zoom - _waveformLastPaintedZoom) > 0.5f) _waveformShouldRepaint = true;
                 if (GUILayout.Button(Content.zoomResetLabel, topBarContainerThirdOption)) _zoom = 1;
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
-                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + LABEL_WIDTH_OFFSET;
                 _time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, _time), GetLastPointTime()), MIN_TIME, MAX_TIME);
                 if (_waveformClip != null) _time = Mathf.Max(_time, _waveformClip.length);
                 EditorGUIUtility.labelWidth = 0;
@@ -495,7 +501,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (GUILayout.Button(Content.clearLabel, GUILayout.ExpandHeight(true), topBarContainerHalfOption))
                 {
                     if (SafeMode && _events.Count > 0)
-                        EditorUtils.ConfirmDialog(message: "You will lose unsaved changes. Continue?", onOk: Clear);
+                        EditorUtils.ConfirmDialog(title: "Safe Mode warning", 
+                            message: "You will lose unsaved changes. Are you sure you want to clear all points?", onOk: Clear);
                     else Clear();
                 }
 
@@ -757,7 +764,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     {
                         var point = _selectedPoints[0];
                         EditorGUI.BeginChangeCheck();
-                        EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.sharpnessLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                        EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.sharpnessLabel).x + LABEL_WIDTH_OFFSET;
                         float newTime = Mathf.Clamp(EditorGUILayout.FloatField(Content.timeLabel, point.Time), _dragMin, _dragMax);
                         if (EditorGUI.EndChangeCheck())
                         {
@@ -795,7 +802,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     EditorGUILayout.LabelField(Content.mouseOptionsLabel, EditorStyles.boldLabel);
 
-                    EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.pointDragLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                    EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.pointDragLabel).x + LABEL_WIDTH_OFFSET;
                     Rect controlRect = EditorGUILayout.GetControlRect();
                     Rect currentRect = new(controlRect.x, controlRect.y, EditorGUIUtility.labelWidth, controlRect.height);
                     EditorGUI.LabelField(currentRect, Content.pointDragLabel);

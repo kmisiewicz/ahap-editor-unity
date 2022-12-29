@@ -42,7 +42,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void HandleImport()
+        private void HandleImport(DataFormat dataFormat = DataFormat.Linear)
         {
             if (_vibrationAsset == null)
             {
@@ -69,7 +69,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     AHAPFile ahap = JsonConvert.DeserializeObject<AHAPFile>(jsonText);
                     Clear();
-                    ImportAHAPFile(ahap);
+                    ImportAHAPFile(ahap, dataFormat);
                     return;
                 }
                 catch (Exception ex)
@@ -81,7 +81,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 {
                     HapticFile haptic = JsonConvert.DeserializeObject<HapticFile>(jsonText);
                     Clear();
-                    ImportHapticFile(haptic);
+                    ImportHapticFile(haptic, dataFormat);
                 }
                 catch (Exception ex)
                 {
@@ -96,7 +96,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void ImportAHAPFile(AHAPFile ahap)
+        private void ImportAHAPFile(AHAPFile ahap, DataFormat dataFormat = DataFormat.Linear)
         {
             try
             {
@@ -106,9 +106,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                     Event e = patternElement.Event;
                     int index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_INTENSITY);
-                    float intensity = index != -1 ? (float)e.EventParameters[index].ParameterValue : 1;
+                    float intensity = index != -1 ? CalculateImportParameter(e.EventParameters[index].ParameterValue, dataFormat) : 1;
                     index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_SHARPNESS);
-                    float sharpness = index != -1 ? (float)e.EventParameters[index].ParameterValue : 0;
+                    float sharpness = index != -1 ? CalculateImportParameter(e.EventParameters[index].ParameterValue, dataFormat) : 0;
                     if (e.EventType == AHAPFile.EVENT_TRANSIENT)
                     {
                         _events.Add(new TransientEvent((float)e.Time, intensity, sharpness));
@@ -123,7 +123,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         while (curve != null)
                         {
                             foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
-                                points.Add(new EventPoint((float)point.Time, (float)point.ParameterValue, ce));
+                                points.Add(new EventPoint((float)point.Time, CalculateImportParameter(point.ParameterValue, dataFormat), ce));
                             t = points.Last().Time;
                             curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
                         }
@@ -144,7 +144,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         while (curve != null)
                         {
                             foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
-                                points.Add(new EventPoint((float)point.Time, (float)point.ParameterValue, ce));
+                                points.Add(new EventPoint((float)point.Time, CalculateImportParameter(point.ParameterValue, dataFormat), ce));
                             t = points.Last().Time;
                             curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
                         }
@@ -171,7 +171,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void ImportHapticClip()
+        private void ImportHapticClip(DataFormat dataFormat = DataFormat.Linear)
         {
             string json = string.Empty;
             try 
@@ -196,7 +196,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 HapticFile haptic = JsonConvert.DeserializeObject<HapticFile>(json);
                 Clear();
-                ImportHapticFile(haptic);
+                ImportHapticFile(haptic, dataFormat);
             }
             catch (Exception ex)
             {
@@ -204,7 +204,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void ImportHapticFile(HapticFile haptic)
+        private void ImportHapticFile(HapticFile haptic, DataFormat dataFormat = DataFormat.Linear)
         {
             var amplitudes = haptic.signals.continuous.envelopes.amplitude;
             var frequencies = haptic.signals.continuous.envelopes.frequency;
@@ -223,7 +223,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (amplitude.emphasis != null)
                 {
                     _events.Add(new TransientEvent((float)amplitude.time,
-                        CalculateImportParameter(amplitude.emphasis.amplitude), CalculateImportParameter(amplitude.emphasis.frequency)));
+                        CalculateImportParameter(amplitude.emphasis.amplitude, dataFormat),
+                        CalculateImportParameter(amplitude.emphasis.frequency, dataFormat)));
                 }
             }
             (float minTime, float maxTime) = (points[0].Time, points.Last().Time);
@@ -231,7 +232,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             points = new();
             foreach (var frequency in frequencies)
-                points.Add(new EventPoint((float)frequency.time, CalculateImportParameter(frequency.frequency), ce));
+                points.Add(new EventPoint((float)frequency.time, CalculateImportParameter(frequency.frequency, dataFormat), ce));
 
             if (!Mathf.Approximately(points[0].Time, minTime))
             {
@@ -255,7 +256,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _projectName = haptic.metadata.project;
         }
 
-        private float CalculateImportParameter(double input, DataFormat dataFormat = DataFormat.Linear)
+        private float CalculateImportParameter(double input, DataFormat dataFormat)
         {
             float floatInput = (float)input;
             return dataFormat switch

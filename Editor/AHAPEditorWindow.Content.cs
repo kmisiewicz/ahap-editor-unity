@@ -27,7 +27,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float NEIGHBOURING_POINT_OFFSET = 0.001f;
         const float MIN_WAVEFORM_RENDER_SCALE = 0.1f;
         const float MAX_WAVEFORM_RENDER_SCALE = 2f;
-        const float CUSTOM_LABEL_WIDTH_OFFSET = 3;
+        const float LABEL_WIDTH_OFFSET = 3;
         const float PLOT_AREA_BASE_WIDTH = 0.80f;
         const float PLOT_AREA_MIN_WIDTH = 0.55f;
         const float PLOT_AREA_MAX_WIDTH = 0.86f;

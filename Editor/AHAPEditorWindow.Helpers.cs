@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -66,8 +67,26 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _currentEvent = null;
             _selectedPoints.Clear();
             SafeMode = EditorPrefs.GetBool(SAFE_MODE_KEY, true);
+            _importFormatMenu = new GenericMenu();
+            Type dataFormatType = typeof(DataFormat);
+            string[] dataFormats = Enum.GetNames(dataFormatType);
+            foreach (var dataFormat in dataFormats)
+            {
+                var attribute = dataFormatType.GetMember(dataFormat).First().GetCustomAttribute<InspectorNameAttribute>();
+                string dataFormatName = attribute != null ? attribute.displayName : dataFormat;
+                _importFormatMenu.AddItem(new GUIContent(dataFormatName), false, 
+                    () => OnImportClicked((DataFormat)Enum.Parse(dataFormatType, dataFormat)));
+            }
 
             DebugMode = EditorPrefs.GetBool(DEBUG_MODE_KEY, false);
+        }
+
+        private void OnImportClicked(DataFormat dataFormat = DataFormat.Linear)
+        {
+            if (SafeMode && _events.Count > 0)
+                EditorUtils.ConfirmDialog(title: "Safe Mode warning",
+                    message: "You will lose unsaved changes. Continue import?", onOk: () => HandleImport(dataFormat));
+            else HandleImport(dataFormat);
         }
 
         private bool IsTimeInView(float time)

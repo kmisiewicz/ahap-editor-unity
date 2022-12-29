@@ -115,11 +115,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public const string CURVE_INTENSITY = "HapticIntensityControl";
         public const string CURVE_SHARPNESS = "HapticSharpnessControl";
 
-        public int Version { get; set; }
+        public double Version { get; set; }
         public Metadata Metadata { get; set; }
         public List<Pattern> Pattern { get; set; }
 
-        public AHAPFile(int version, Metadata metadata, List<Pattern> pattern)
+        public AHAPFile(double version, Metadata metadata, List<Pattern> pattern)
         {
             Version = version;
             Metadata = metadata;

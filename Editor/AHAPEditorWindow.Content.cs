@@ -59,6 +59,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent logRectsLabel = new("Log Rects");
             public static readonly GUIContent drawRectsLabel = new("Draw Rects");
             public static readonly GUIContent fileLabel = new("File");
+            public static readonly GUIContent assetLabel = new("Asset",
+                "Supports AHAP and Haptic JSON or HapticClip (Lofelt's NiceVibrations) asset.");
             public static readonly GUIContent importLabel = new("Import");
             public static readonly GUIContent saveLabel = new("Save");
             public static readonly GUIContent waveformSectionLabel = new("Reference waveform");
@@ -110,5 +112,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         enum MouseButton { Left = 0, Right = 1, Middle = 2 }
 
         enum MouseMode { AddRemove = 0, Select = 1, None = -1 }
+
+        enum DataFormat 
+        { 
+            Linear = 0,
+            [InspectorName("Power of 2")] Squared = 1,
+            [InspectorName("Power of 2.28")] Power2_28 = 2,
+        }
     }
 }

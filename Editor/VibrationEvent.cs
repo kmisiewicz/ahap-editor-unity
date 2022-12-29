@@ -45,9 +45,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public abstract bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint);
 
+        public abstract bool IsOnPointInEvent(in Rect offsetRect, MouseLocation location, out EventPoint eventPoint);
+
         public abstract bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location);
 
-        public abstract List<Pattern> ToPatterns();
+        public abstract List<Pattern> ToAHAP();
     }
 
     internal class TransientEvent : VibrationEvent
@@ -87,9 +89,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return false;
         }
 
+        public override bool IsOnPointInEvent(in Rect offsetRect, MouseLocation location, out EventPoint eventPoint)
+        {
+            eventPoint = null;
+            if (location != MouseLocation.Outside)
+            {
+                var pointToTest = location == MouseLocation.IntensityPlot ? Intensity : Sharpness;
+                if (offsetRect.Contains(pointToTest))
+                {
+                    eventPoint = pointToTest;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public override bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location) => true;
 
-        public override List<Pattern> ToPatterns()
+        public override List<Pattern> ToAHAP()
         {
             Event e = new(Time, AHAPFile.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
             return new List<Pattern>() { new Pattern(e, null) };
@@ -144,6 +161,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return false;
         }
 
+        public override bool IsOnPointInEvent(in Rect offsetRect, MouseLocation location, out EventPoint eventPoint)
+        {
+            eventPoint = null;
+            if (location != MouseLocation.Outside)
+            {
+                List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
+                foreach (EventPoint ep in curve)
+                {
+                    if (offsetRect.Contains(ep))
+                    {
+                        eventPoint = ep;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         public override bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location)
         {
             if (location != MouseLocation.Outside)
@@ -157,7 +192,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return false;
         }
 
-        public override List<Pattern> ToPatterns()
+        public override List<Pattern> ToAHAP()
         {
             List<Pattern> list = new();
 

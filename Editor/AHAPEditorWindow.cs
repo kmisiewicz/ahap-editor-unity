@@ -12,7 +12,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         #region Fields
 
         // Data
-        TextAsset _ahapFile;
+        UnityEngine.Object _vibrationAsset;
         string _projectName = "";
         List<VibrationEvent> _events = new();
 
@@ -406,10 +406,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 EditorGUILayout.LabelField(Content.fileLabel, EditorStyles.boldLabel);
 
-                _ahapFile = EditorGUILayout.ObjectField(GUIContent.none, _ahapFile, typeof(TextAsset), false) as TextAsset;
+                EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.assetLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                _vibrationAsset = EditorGUILayout.ObjectField(Content.assetLabel, _vibrationAsset, typeof(UnityEngine.Object), false);
+                EditorGUIUtility.labelWidth = 0;
 
                 GUILayout.BeginHorizontal();
-                GUI.enabled = _ahapFile != null;
+                GUI.enabled = _vibrationAsset != null;
                 if (GUILayout.Button(Content.importLabel)) HandleImport();
                 GUI.enabled = true;
                 if (GUILayout.Button(Content.saveLabel)) HandleSaving();

@@ -27,7 +27,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private void ResetState()
         {
-            _ahapFile = null;
+            _vibrationAsset = null;
             _projectName = "";
             _waveformClip = null;
             _waveformRenderScale = _waveformLastPaintedZoom = 1f;
@@ -86,10 +86,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private EventPoint GetPointOnPosition(Vector2 plotPosition, MouseLocation plot)
         {
+            if (plot == MouseLocation.Outside) return null;
             Vector2 pointOffset = new(HOVER_OFFSET * _time / _plotScrollSize.x, HOVER_OFFSET / _plotScreenSize.y);
+            Rect offsetRect = new(plotPosition - pointOffset, pointOffset * 2);
             foreach (var ev in _events)
             {
-                if (ev.IsOnPointInEvent(plotPosition, pointOffset, plot, out EventPoint eventPoint))
+                if (ev.IsOnPointInEvent(in offsetRect, plot, out EventPoint eventPoint))
                     return eventPoint;
             }
             return null;
@@ -112,9 +114,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             List<Pattern> patternList = new();
             foreach (var ev in _events)
-                patternList.AddRange(ev.ToPatterns());
+                patternList.AddRange(ev.ToAHAP());
             patternList.Sort();
             return new AHAPFile(1, new Metadata(_projectName), patternList);
+        }
+
+        private HapticFile ConvertEventsToHapticFile()
+        {
+            return new HapticFile();
         }
 
         private void HandleNonHoverClick()

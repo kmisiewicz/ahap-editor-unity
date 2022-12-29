@@ -8,6 +8,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     public partial class AHAPEditorWindow : IHasCustomMenu
     {
+        bool SafeMode
+        {
+            get => _safeMode;
+            set
+            {
+                _safeMode = value;
+                EditorPrefs.SetBool(SAFE_MODE_KEY, value);
+            }
+        }
+
         bool DebugMode
         {
             get => _debugMode;
@@ -23,6 +33,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public void AddItemsToMenu(GenericMenu menu)
         {
             menu.AddItem(Content.resetLabel, false, () => ResetState());
+            menu.AddItem(Content.safeModeLabel, SafeMode, () => SafeMode = !SafeMode);
             menu.AddSeparator("");
             menu.AddItem(Content.debugModeLabel, DebugMode, () => DebugMode = !DebugMode);
         }
@@ -51,11 +62,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _mouseMode = MouseMode.AddRemove;
             _mouseModes = Enum.GetNames(typeof(MouseMode));
             _plotAreaWidthFactor = PLOT_AREA_BASE_WIDTH;
-            _pointEditAreaVisible = false;
+            _pointEditAreaVisible = EditorPrefs.GetBool(ADVANCED_PANEL_KEY, false);
             _currentEvent = null;
             _selectedPoints.Clear();
+            SafeMode = EditorPrefs.GetBool(SAFE_MODE_KEY, true);
 
-            DebugMode = false;
+            DebugMode = EditorPrefs.GetBool(DEBUG_MODE_KEY, false);
         }
 
         private bool IsTimeInView(float time)

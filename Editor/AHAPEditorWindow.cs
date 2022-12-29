@@ -22,6 +22,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         bool _pointEditAreaVisible;
         float _plotAreaWidthFactor, _plotAreaWidthFactorOffset;
         string[] _pointDragModes, _mouseModes;
+        bool _safeMode;
 
         // Mouse handling
         UnityEngine.Event _currentEvent;
@@ -78,7 +79,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Rect topBarRect = new(CONTENT_MARGIN, new Vector2(position.width - CONTENT_MARGIN.x * 2, topBarHeight));
             float topBarOptionsContainerWidth = Screen.currentResolution.height * TOP_BAR_OPTIONS_SIZE_FACTOR;
             var topBarMaxWidthOption = GUILayout.MaxWidth(topBarOptionsContainerWidth);
-            var topBarContainerHalfOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.5f);
+            var topBarContainerHalfOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.495f);
             var topBarContainerThirdOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f);
 
             float bottomPartHeight = position.height - CONTENT_MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
@@ -375,7 +376,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         sb.AppendLine($"Sharpness plot: {sharpnessPlotRect} (blue)");
                         sb.AppendLine($"Scroll rect: {scrollRect} (translucent white)");
                         sb.AppendLine($"Y axis label rect: {yAxisLabelRect} (white)");
-                        sb.AppendLine($"X axis label rect: {new Rect(intensityPlotRect.position + xAxisLabelRect.position, xAxisLabelRect.size)} (white)");
+                        Rect xLabelDebugRect = new(intensityPlotRect.position + xAxisLabelRect.position, xAxisLabelRect.size);
+                        sb.AppendLine($"X axis label rect: {xLabelDebugRect} (white)");
                         sb.AppendLine($"Resize bar: {resizeBarRect} (white)");
                         Debug.Log(sb.ToString());
                     }
@@ -462,24 +464,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 GUILayout.Space(-1);
 
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button(Content.zoomResetLabel, topBarContainerThirdOption)) _zoom = 1;
                 EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.zoomLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
                 _zoom = (float)Math.Round(EditorGUILayout.Slider(Content.zoomLabel, _zoom, 1, MAX_ZOOM), 1);
                 if (Mathf.Abs(_zoom - _waveformLastPaintedZoom) > 0.5f) _waveformShouldRepaint = true;
+                if (GUILayout.Button(Content.zoomResetLabel, topBarContainerThirdOption)) _zoom = 1;
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
-                if (GUILayout.Button(Content.trimButtonLabel, topBarContainerThirdOption))
-                    _time = _waveformClip != null ? _waveformClip.length : GetLastPointTime();
                 EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.timeLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
                 _time = Mathf.Clamp(Mathf.Max(EditorGUILayout.FloatField(Content.timeLabel, _time), GetLastPointTime()), MIN_TIME, MAX_TIME);
                 if (_waveformClip != null) _time = Mathf.Max(_time, _waveformClip.length);
                 EditorGUIUtility.labelWidth = 0;
+                if (GUILayout.Button(Content.trimButtonLabel, topBarContainerThirdOption))
+                    _time = _waveformClip != null ? _waveformClip.length : GetLastPointTime();
                 GUILayout.EndHorizontal();
 
-                if (GUILayout.Button(Content.clearLabel)) Clear();
-
-                GUILayout.Space(-1);
+                GUILayout.FlexibleSpace();
             }
             GUILayout.EndVertical();
 
@@ -487,11 +487,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             GUILayout.BeginVertical(GUI.skin.box, topBarMaxWidthOption);
             {
                 EditorGUILayout.LabelField(Content.pointEditingLabel, EditorStyles.boldLabel);
-                GUILayout.Space(-1);
+                GUILayout.Space(-2);
 
                 _mouseMode = (MouseMode)(GUILayout.Toolbar((int)_mouseMode, _mouseModes[..^1]));
 
-                _pointEditAreaVisible = GUILayout.Toggle(_pointEditAreaVisible, Content.advancedPanelLabel, GUI.skin.button, GUILayout.ExpandHeight(true));
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button(Content.clearLabel, GUILayout.ExpandHeight(true), topBarContainerHalfOption))
+                {
+                    if (SafeMode && _events.Count > 0)
+                        EditorUtils.ConfirmDialog(message: "You will lose unsaved changes. Continue?", onOk: Clear);
+                    else Clear();
+                }
+
+                EditorGUI.BeginChangeCheck();
+                _pointEditAreaVisible = GUILayout.Toggle(_pointEditAreaVisible, Content.advancedPanelLabel, GUI.skin.button,
+                    GUILayout.ExpandHeight(true), topBarContainerHalfOption);
+                if (EditorGUI.EndChangeCheck()) EditorPrefs.SetBool(ADVANCED_PANEL_KEY, _pointEditAreaVisible);
+                GUILayout.EndHorizontal();
             }
             GUILayout.EndVertical();
 
@@ -778,21 +790,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 GUILayout.EndVertical();
 
-                // Point drag mode
+                // Mouse options
                 GUILayout.BeginVertical(GUI.skin.box);
                 {
-                    EditorGUILayout.LabelField(Content.pointDragLabel, EditorStyles.boldLabel);
-                    _pointDragMode = (PointDragMode)GUILayout.Toolbar((int)_pointDragMode, _pointDragModes);
+                    EditorGUILayout.LabelField(Content.mouseOptionsLabel, EditorStyles.boldLabel);
+
+                    EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.pointDragLabel).x + CUSTOM_LABEL_WIDTH_OFFSET;
+                    Rect controlRect = EditorGUILayout.GetControlRect();
+                    Rect currentRect = new(controlRect.x, controlRect.y, EditorGUIUtility.labelWidth, controlRect.height);
+                    EditorGUI.LabelField(currentRect, Content.pointDragLabel);
+                    currentRect.x += EditorGUIUtility.labelWidth + 2;
+                    currentRect.width = controlRect.width - EditorGUIUtility.labelWidth - 2;
+                    _pointDragMode = (PointDragMode)GUI.Toolbar(currentRect, (int)_pointDragMode, _pointDragModes);
+
+                    _snapMode = (SnapMode)EditorGUILayout.EnumPopup(Content.snappingLabel, _snapMode);
+
                     GUILayout.Space(3);
-                }
-                GUILayout.EndVertical();
-                
-                // Snapping
-                GUILayout.BeginVertical(GUI.skin.box);
-                {
-                    EditorGUILayout.LabelField(Content.snappingLabel, EditorStyles.boldLabel);
-                    _snapMode = (SnapMode)EditorGUILayout.EnumPopup(GUIContent.none, _snapMode);
-                    GUILayout.Space(3);
+                    EditorGUIUtility.labelWidth = 0;
                 }
                 GUILayout.EndVertical();
 

@@ -5,6 +5,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     public partial class AHAPEditorWindow
     {
+        // EditorPrefs keys
+        const string SAFE_MODE_KEY = "CHROMA_HAPTICS_EDITOR_SAFE_MODE";
+        const string ADVANCED_PANEL_KEY = "CHROMA_HAPTICS_EDITOR_ADVANCED_PANEL";
+        const string DEBUG_MODE_KEY = "CHROMA_HAPTICS_EDITOR_DEBUG_MODE";
+
         // Const settings
         const float MIN_TIME = 0.1f;
         const float MAX_TIME = 30f;
@@ -54,6 +59,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const string WINDOW_ICON_NAME = "d_HoloLensInputModule Icon";
             public const string PLAY_ICON_NAME = "d_PlayButton";
 
+            public static readonly GUIContent safeModeLabel = new("Safe Mode");
             public static readonly GUIContent debugModeLabel = new("Debug Mode");
             public static readonly GUIContent debugLabel = new("Debug");
             public static readonly GUIContent logRectsLabel = new("Log Rects");
@@ -90,6 +96,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent valueLabel = new("Value");
             public static readonly GUIContent resetLabel = new("Reset");
             public static readonly GUIContent pointDragLabel = new("Point Drag Mode");
+            public static readonly GUIContent mouseOptionsLabel = new("Mouse Options");
         }
 
         class Styles

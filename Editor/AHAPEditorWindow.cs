@@ -47,17 +47,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         #endregion
 
-        bool DebugMode
-        {
-            get => _debugMode;
-            set
-            {
-                _debugMode = value;
-                if (!_debugMode)
-                    _drawRects = false;
-            }
-        }
-
         [MenuItem("Window/AHAP Editor")]
         public static void OpenWindow()
         {

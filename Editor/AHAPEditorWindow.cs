@@ -34,7 +34,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         PointDragMode _pointDragMode = PointDragMode.FreeMove;
         SnapMode _snapMode = SnapMode.None;
         MouseMode _mouseMode;
-        EventPoint _hoverPoint, _draggedPoint;
+        EventPoint _hoverPoint, _draggedPoint, _singleSelectedPoint;
         List<EventPoint> _selectedPoints;
         bool _selectingPoints, _pointEditAreaResize;
         float _dragMin, _dragMax, _dragValueMin, _dragValueMax, _dragMinBound, _dragMaxBound;
@@ -770,9 +770,17 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         var point = _selectedPoints[0];
                         EditorGUI.BeginChangeCheck();
                         EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(Content.sharpnessLabel).x + LABEL_WIDTH_OFFSET;
-                        float newTime = Mathf.Clamp(EditorGUILayout.FloatField(Content.timeLabel, point.Time), _dragMin, _dragMax);
+                        float newTime = EditorGUILayout.FloatField(Content.timeLabel, point.Time);
                         if (EditorGUI.EndChangeCheck())
                         {
+                            if (point != _singleSelectedPoint)
+                            {
+                                _singleSelectedPoint = point;
+                                _hoverPoint = point;
+                                HandleDragStart();
+                                _draggedPoint = null;
+                            }
+                            newTime = Mathf.Clamp(newTime, _dragMinBound, _dragMaxBound);
                             if (point.ParentEvent is TransientEvent transientEvent)
                             {
                                 transientEvent.Sharpness.Time = transientEvent.Intensity.Time = newTime;

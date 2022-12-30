@@ -45,6 +45,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _events.Clear();
             _selectedPoints ??= new List<EventPoint>();
             _selectedPoints.Clear();
+            _singleSelectedPoint = null;
             _zoom = 1f;
             _time = _waveformClip != null ? _waveformClip.length : 1;
         }

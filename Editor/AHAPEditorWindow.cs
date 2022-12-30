@@ -322,6 +322,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         SelectHoverEvent();
                     }
                 }
+                else if (_currentEvent.type == EventType.MouseUp)
+                {
+                    _selectingPoints = false;
+                    _previousMouseState = EventType.MouseUp;
+                }
             }
             
             // Handle point edit area resizing

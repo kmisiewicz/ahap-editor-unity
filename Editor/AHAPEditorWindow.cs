@@ -714,7 +714,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             // Highlighted points
-            if (_draggedPoint != null)
+            if (_draggedPoint != null && _selectedPoints.Any((point) => point.ParentEvent is ContinuousEvent))
             {
                 Handles.color = Colors.draggedPoint;
                 Rect dragRect = _mouseClickLocation == MouseLocation.IntensityPlot ? intensityPlotRect : sharpnessPlotRect;

@@ -118,6 +118,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public List<EventPoint> IntensityCurve;
         public List<EventPoint> SharpnessCurve;
 
+        public override float Time => IntensityCurve?.FirstOrDefault()?.Time ?? 0;
+
         public ContinuousEvent() { }
 
         public ContinuousEvent(Vector2 startEndTimes, Vector2 intensity, Vector2 sharpness)
@@ -139,8 +141,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             IntensityCurve = plot == MouseLocation.IntensityPlot ? specCurve : defaultCurve;
             SharpnessCurve = plot == MouseLocation.SharpnessPlot ? specCurve : defaultCurve;
         }
-
-        public override float Time => IntensityCurve?.FirstOrDefault()?.Time ?? 0;
 
         public override bool IsOnPointInEvent(Vector2 point, Vector2 offset, MouseLocation location, out EventPoint eventPoint)
         {
@@ -164,7 +164,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public override bool IsOnPointInEvent(in Rect offsetRect, MouseLocation location, out EventPoint eventPoint)
         {
             eventPoint = null;
-            if (location != MouseLocation.Outside)
+            if (location != MouseLocation.Outside || offsetRect.xMax < Time || offsetRect.xMin > IntensityCurve.Last().Time)
             {
                 List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
                 foreach (EventPoint ep in curve)

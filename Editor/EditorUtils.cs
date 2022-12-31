@@ -31,5 +31,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             onCancel?.Invoke();
             return false;
         }
+
+        /// <summary>
+        /// Draws <see cref="EditorGUILayout.FloatField"/> with <see cref="EditorGUIUtility.labelWidth"/> 
+        /// calculated with <paramref name="content"/>, adjusted by <paramref name="labelWidthOffset"/>. 
+        /// Resets <see cref="EditorGUIUtility.labelWidth"/> after.
+        /// </summary>
+        /// <returns>The value entered by the user.</returns>
+        public static float LabelLayoutFloatField(GUIContent content, float labelWidthOffset, float value, params GUILayoutOption[] options)
+        {
+            EditorGUIUtility.labelWidth = EditorStyles.label.CalcSize(content).x + labelWidthOffset;
+            float returnValue = EditorGUILayout.FloatField(content, value, options);
+            EditorGUIUtility.labelWidth = 0;
+            return returnValue;
+        }
     }
 }

@@ -611,6 +611,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             // Events
+            bool reachedEndOfViewport = false;
             foreach (var vibrationEvent in _events)
             {
                 if (vibrationEvent is TransientEvent transientEvent)
@@ -628,33 +629,34 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         Handles.DrawAAPolyLine(PLOT_EVENT_LINE_WIDTH, sharpnessPoint, new Vector3(sharpnessPoint.x, _plotHeightOffset + _plotScreenSize.y));
                     }
                 }
-                else if (vibrationEvent is ContinuousEvent continuousEvent)
+                else if (!reachedEndOfViewport && vibrationEvent is ContinuousEvent continuousEvent)
                 {
                     Handles.color = Colors.eventContinuous;
-                    DrawContinuousEvent(continuousEvent.IntensityCurve);
-                    DrawContinuousEvent(continuousEvent.SharpnessCurve, _plotHeightOffset);
+                    bool b1 = DrawContinuousEvent(continuousEvent.IntensityCurve);
+                    bool b2 = DrawContinuousEvent(continuousEvent.SharpnessCurve, _plotHeightOffset);
+                    if (b1 && b2) reachedEndOfViewport = true;
 
-                    void DrawContinuousEvent(List<EventPoint> curve, float heightOffset = 0)
+                    bool DrawContinuousEvent(List<EventPoint> curve, float heightOffset = 0)
                     {
+                        bool reachedEndOfViewport = false;
                         List<Vector3> points = new();
                         int pointCount = curve.Count;
                         int startIndex = 0, endIndex = pointCount - 1;
-                        for (int i = 0; i < pointCount; i++)
+                        for (; startIndex < pointCount; startIndex++)
                         {
-                            if (IsTimeInView(curve[i].Time))
+                            if (IsTimeInView(curve[startIndex].Time))
+                                break;
+                        }
+                        for (endIndex = startIndex; endIndex < pointCount; endIndex++)
+                        {
+                            if (!IsTimeInView(curve[endIndex].Time))
                             {
-                                startIndex = Mathf.Max(i - 1, 0);
+                                reachedEndOfViewport = true;
                                 break;
                             }
                         }
-                        for (int j = pointCount - 1; j >= 0; j--)
-                        {
-                            if (IsTimeInView(curve[j].Time))
-                            {
-                                endIndex = Mathf.Min(j + 1, pointCount - 1);
-                                break;
-                            }
-                        }
+                        startIndex = Mathf.Max(startIndex - 1, 0);
+                        endIndex = Mathf.Min(endIndex + 1, pointCount - 1);
                         if (startIndex == 0)
                             points.Add(PointToScrollCoords(curve[0].Time, 0, heightOffset));
                         for (int k = startIndex; k <= endIndex; k++)

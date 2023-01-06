@@ -41,7 +41,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         private void Clear()
         {
-            _events ??= new List<VibrationEvent>();
+            _events ??= new List<HapticEvent>();
             _events.Clear();
             _selectedPoints ??= new List<EventPoint>();
             _selectedPoints.Clear();
@@ -154,18 +154,95 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return lastPointTime;
         }
 
-        private AHAPFile ConvertEventsToAHAPFile()
+        private JsonAHAP ConvertEventsToAHAPFile(DataFormat dataFormat = DataFormat.Linear)
         {
             List<Pattern> patternList = new();
             foreach (var ev in _events)
                 patternList.AddRange(ev.ToAHAP());
             patternList.Sort();
-            return new AHAPFile(1, new Metadata(_projectName), patternList);
+            return new JsonAHAP(1, new Metadata(_projectName), patternList);
         }
 
-        private HapticFile ConvertEventsToHapticFile()
+        private JsonHaptic ConvertEventsToHapticFile(DataFormat dataFormat = DataFormat.Linear)
         {
-            return new HapticFile();
+            _events.Sort();
+            List<ContinuousEvent> continuousEvents = new();
+            List<TransientEvent> transientEvents = new();
+            foreach (var ev in _events)
+            {
+                if (ev is ContinuousEvent ce) continuousEvents.Add(ce);
+                else if (ev is TransientEvent te) transientEvents.Add(te);
+            }
+            List<Amplitude> amplitudes = new();
+            List<Frequency> frequencies = new();
+            foreach (var ce in continuousEvents)
+            {
+                foreach (var intensity in ce.IntensityCurve)
+                    amplitudes.Add(new Amplitude(intensity.Time, CalculateExportParameter(intensity.Value, dataFormat)));
+                foreach (var sharpness in ce.SharpnessCurve)
+                    frequencies.Add(new Frequency(sharpness.Time, CalculateExportParameter(sharpness.Value, dataFormat)));
+            }
+            if (amplitudes[0].time != 0)
+            {
+                amplitudes.Insert(0, new Amplitude(0, 0));
+                amplitudes.Insert(1, new Amplitude(Mathf.Max((float)amplitudes[1].time - NEIGHBOURING_POINT_OFFSET, 0), 0));
+            }
+            if (frequencies[0].time != 0)
+            {
+                frequencies.Insert(0, new Frequency(0, 0));
+                frequencies.Insert(1, new Frequency(Mathf.Max((float)frequencies[1].time - NEIGHBOURING_POINT_OFFSET, 0), 0));
+            }
+
+            (Amplitude lastAmplitude, Frequency lastFrequency) = (amplitudes.Last(), frequencies.Last());
+            if (!Mathf.Approximately((float)lastAmplitude.time, (float)lastFrequency.time)) // shouldn't happen?
+            {
+                if (lastAmplitude.time > lastFrequency.time)
+                    frequencies.Add(new Frequency(lastAmplitude.time, lastFrequency.frequency));
+                else
+                    amplitudes.Add(new Amplitude(lastFrequency.time, lastAmplitude.amplitude));
+            }
+
+            (lastAmplitude, lastFrequency) = (amplitudes.Last(), frequencies.Last());
+            if (transientEvents.Count > 0 && transientEvents.Last().Time > (float)amplitudes.Last().time) 
+            {
+                TransientEvent lastTransient = transientEvents.Last();
+                amplitudes.Add(new Amplitude(lastAmplitude.time + NEIGHBOURING_POINT_OFFSET, 0));
+                amplitudes.Add(new Amplitude(lastTransient.Time, 0));
+                frequencies.Add(new Frequency(lastFrequency.time + NEIGHBOURING_POINT_OFFSET, 0));
+                frequencies.Add(new Frequency(lastTransient.Time, 0));
+            }
+
+            int startIndex = 0;
+            foreach (var te in transientEvents)
+            {
+                int index = amplitudes.FindIndex(a => Mathf.Approximately((float)a.time, te.Time));
+                if (index != -1) 
+                {
+                    amplitudes[index].emphasis = new Emphasis(CalculateExportParameter(te.Intensity.Value, dataFormat),
+                        CalculateExportParameter(te.Sharpness.Value, dataFormat));
+                    startIndex = index;
+                }
+                else
+                {
+                    index = amplitudes.FindIndex(startIndex, a => a.time > te.Time);
+                    if (index != -1)
+                    {
+                        float val1 = CalculateImportParameter(amplitudes[index - 1].amplitude, dataFormat);
+                        float val2 = CalculateImportParameter(amplitudes[index].amplitude, dataFormat);
+                        float value = Mathf.Lerp(val1, val2, (te.Time - val1) / (val2 - val1));
+                        Amplitude a = new(te.Time, CalculateExportParameter(value, dataFormat));
+                        a.emphasis = new Emphasis(CalculateExportParameter(te.Intensity.Value, dataFormat),
+                            CalculateExportParameter(te.Sharpness.Value, dataFormat));
+                        amplitudes.Insert(index, a);
+                        startIndex = index;
+                    }
+                }
+            }
+
+            JsonHaptic hapticFile = new();
+            hapticFile.signals.continuous.envelopes.amplitude = amplitudes;
+            hapticFile.signals.continuous.envelopes.frequency = frequencies;
+            return hapticFile;
         }
     }
 }

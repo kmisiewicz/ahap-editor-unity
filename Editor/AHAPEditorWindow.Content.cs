@@ -97,6 +97,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent resetLabel = new("Reset");
             public static readonly GUIContent pointDragLabel = new("Point Drag Mode");
             public static readonly GUIContent mouseOptionsLabel = new("Mouse Options");
+            public static readonly GUIContent dataFormatLabel = new("Data Format");
+            public static readonly GUIContent fileFormatLabel = new("File Format");
+            public static readonly GUIContent overwriteLabel = new("Overwrite");
+            public static readonly GUIContent cancelLabel = new("Cancel");
+            public static readonly GUIContent saveAsJsonLabel = new("Use .json Extension");
         }
 
         class Styles
@@ -126,5 +131,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             [InspectorName("Power of 2")] Squared = 1,
             [InspectorName("Power of 2.28")] Power2_28 = 2,
         }
+
+        enum FileFormat { AHAP = 0, Haptic = 1 }
     }
 }

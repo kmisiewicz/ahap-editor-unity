@@ -14,7 +14,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         // Data
         UnityEngine.Object _vibrationAsset;
         string _projectName = "";
-        List<VibrationEvent> _events = new();
+        List<HapticEvent> _events = new();
 
         // Drawing
         float _time, _zoom, _plotHeightOffset;
@@ -24,6 +24,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         string[] _pointDragModes, _mouseModes;
         bool _safeMode;
         GenericMenu _importFormatMenu;
+        Rect _saveButtonRect;
 
         // Mouse handling
         UnityEngine.Event _currentEvent;
@@ -78,10 +79,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             float topBarHeight = lineWithSpacing * 4 + lineHalfHeight + lineDoubleSpacing;
             Rect topBarRect = new(CONTENT_MARGIN, new Vector2(position.width - CONTENT_MARGIN.x * 2, topBarHeight));
-            float topBarOptionsContainerWidth = Screen.currentResolution.height * TOP_BAR_OPTIONS_SIZE_FACTOR;
-            var topBarMaxWidthOption = GUILayout.MaxWidth(topBarOptionsContainerWidth);
-            var topBarContainerHalfOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.495f);
-            var topBarContainerThirdOption = GUILayout.MaxWidth(topBarOptionsContainerWidth * 0.33f);
+            float topBarContainerWidth = Screen.currentResolution.height * TOP_BAR_OPTIONS_SIZE_FACTOR;
+            var topBarMaxWidthOption = GUILayout.MaxWidth(topBarContainerWidth);
+            var topBarContainerHalfOption = GUILayout.MaxWidth(topBarContainerWidth * 0.495f);
+            var topBarContainerThirdOption = GUILayout.MaxWidth(topBarContainerWidth * 0.33f);
 
             float bottomPartHeight = position.height - CONTENT_MARGIN.y * 2 - topBarHeight - lineDoubleSpacing * 2;
             Rect bottomPartRect = new(CONTENT_MARGIN.x, CONTENT_MARGIN.y + topBarHeight + lineDoubleSpacing,
@@ -411,7 +412,18 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 GUILayout.EndHorizontal();
                 GUILayout.Space(10);
                 GUI.enabled = true;
-                if (GUILayout.Button(Content.saveLabel, topBarContainerHalfOption)) HandleSaving();
+                if (GUILayout.Button(Content.saveLabel, topBarContainerHalfOption))
+                {
+                    Rect savePosition = GUILayoutUtility.GetLastRect();
+                    savePosition.position = position.position + CONTENT_MARGIN;
+                    savePosition.x += topBarContainerWidth * 0.5f;
+                    savePosition.y += lineWithSpacing * 3;
+                    savePosition.width = topBarContainerWidth;
+                    PopupWindow.Show(_saveButtonRect, new SaveOptionsWindow(
+                        (hasAsset, jsonExt, dataFormat, fileFormat) => HandleSaving(hasAsset, jsonExt, dataFormat, fileFormat),
+                        _vibrationAsset));
+                }
+                if (_currentEvent.type == EventType.Repaint) _saveButtonRect = GUILayoutUtility.GetLastRect();
                 GUILayout.Space(-lineSpacing);
                 GUILayout.EndHorizontal();
 

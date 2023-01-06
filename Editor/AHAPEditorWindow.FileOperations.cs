@@ -12,7 +12,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 {
     public partial class AHAPEditorWindow
     {
-        private void HandleSaving()
+        private void HandleSaving(bool overwrite, bool jsonExt, DataFormat dataFormat, FileFormat fileFormat)
         {
             if (_events.Count == 0)
             {
@@ -20,24 +20,45 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 return;
             }
 
-            var ahapFile = ConvertEventsToAHAPFile();
-            string json = JsonConvert.SerializeObject(ahapFile, Formatting.Indented,
-                new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-
-            if (_vibrationAsset != null && EditorUtility.DisplayDialog("Overwrite file?", "Do you want to overwrite selected file?",
-                "Yes, overwrite", "No, create new"))
+            string json = string.Empty;
+            string extension = "";
+            if (fileFormat == FileFormat.AHAP)
             {
-                File.WriteAllText(Path.Combine(Environment.CurrentDirectory, AssetDatabase.GetAssetPath(_vibrationAsset)), json);
-                EditorUtility.SetDirty(_vibrationAsset);
-                return;
+                JsonAHAP ahapFile = ConvertEventsToAHAPFile(dataFormat);
+                json = JsonConvert.SerializeObject(ahapFile, Formatting.Indented,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+                extension = jsonExt ? ".json" : ".ahap";
+
+            }
+            else if (fileFormat == FileFormat.Haptic)
+            {
+                JsonHaptic hapticFile = ConvertEventsToHapticFile(dataFormat);
+                json = JsonConvert.SerializeObject(hapticFile, Formatting.Indented,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+                extension = jsonExt ? ".json" : ".haptic";
             }
 
-            var path = EditorUtility.SaveFilePanelInProject("Save AHAP JSON", "ahap", "json", "Enter file name");
+            string path = string.Empty;
+            if (_vibrationAsset != null && overwrite)
+            {
+                path = AssetDatabase.GetAssetPath(_vibrationAsset);
+                path = Path.ChangeExtension(path, extension);                
+            }
+            else
+            {
+                path = EditorUtility.SaveFilePanelInProject("Save file", "HapticClip", extension.TrimStart('.'), "Enter file name");
+                if (File.Exists(Path.Combine(Environment.CurrentDirectory, path)))
+                    overwrite = true;
+            }
+
             if (path.Length != 0)
             {
                 File.WriteAllText(Path.Combine(Environment.CurrentDirectory, path), json);
-                AssetDatabase.ImportAsset(path);
-                _vibrationAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+                if (!overwrite)
+                {
+                    AssetDatabase.ImportAsset(path);
+                    _vibrationAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                }
                 EditorUtility.SetDirty(_vibrationAsset);
             }
         }
@@ -67,7 +88,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                 try
                 {
-                    AHAPFile ahap = JsonConvert.DeserializeObject<AHAPFile>(jsonText);
+                    JsonAHAP ahap = JsonConvert.DeserializeObject<JsonAHAP>(jsonText);
                     Clear();
                     ImportAHAPFile(ahap, dataFormat);
                     return;
@@ -79,7 +100,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                 try
                 {
-                    HapticFile haptic = JsonConvert.DeserializeObject<HapticFile>(jsonText);
+                    JsonHaptic haptic = JsonConvert.DeserializeObject<JsonHaptic>(jsonText);
                     Clear();
                     ImportHapticFile(haptic, dataFormat);
                 }
@@ -96,7 +117,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void ImportAHAPFile(AHAPFile ahap, DataFormat dataFormat = DataFormat.Linear)
+        private void ImportAHAPFile(JsonAHAP ahap, DataFormat dataFormat = DataFormat.Linear)
         {
             try
             {
@@ -105,27 +126,27 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     if (patternElement.Event == null) continue;
 
                     Event e = patternElement.Event;
-                    int index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_INTENSITY);
+                    int index = e.EventParameters.FindIndex(param => param.ParameterID == JsonAHAP.PARAM_INTENSITY);
                     float intensity = index != -1 ? CalculateImportParameter(e.EventParameters[index].ParameterValue, dataFormat) : 1;
-                    index = e.EventParameters.FindIndex(param => param.ParameterID == AHAPFile.PARAM_SHARPNESS);
+                    index = e.EventParameters.FindIndex(param => param.ParameterID == JsonAHAP.PARAM_SHARPNESS);
                     float sharpness = index != -1 ? CalculateImportParameter(e.EventParameters[index].ParameterValue, dataFormat) : 0;
-                    if (e.EventType == AHAPFile.EVENT_TRANSIENT)
+                    if (e.EventType == JsonAHAP.EVENT_TRANSIENT)
                     {
                         _events.Add(new TransientEvent((float)e.Time, intensity, sharpness));
                     }
-                    else if (e.EventType == AHAPFile.EVENT_CONTINUOUS)
+                    else if (e.EventType == JsonAHAP.EVENT_CONTINUOUS)
                     {
                         ContinuousEvent ce = new();
 
                         List<EventPoint> points = new();
                         float t = (float)e.Time;
-                        Pattern curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t);
+                        Pattern curve = ahap.FindCurveOnTime(JsonAHAP.CURVE_INTENSITY, t);
                         while (curve != null)
                         {
                             foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
                                 points.Add(new EventPoint((float)point.Time, CalculateImportParameter(point.ParameterValue, dataFormat), ce));
                             t = points.Last().Time;
-                            curve = ahap.FindCurveOnTime(AHAPFile.CURVE_INTENSITY, t, curve);
+                            curve = ahap.FindCurveOnTime(JsonAHAP.CURVE_INTENSITY, t, curve);
                         }
                         if (points.Count == 0)
                         {
@@ -140,13 +161,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                         points = new();
                         t = (float)e.Time;
-                        curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t);
+                        curve = ahap.FindCurveOnTime(JsonAHAP.CURVE_SHARPNESS, t);
                         while (curve != null)
                         {
                             foreach (var point in curve.ParameterCurve.ParameterCurveControlPoints)
                                 points.Add(new EventPoint((float)point.Time, CalculateImportParameter(point.ParameterValue, dataFormat), ce));
                             t = points.Last().Time;
-                            curve = ahap.FindCurveOnTime(AHAPFile.CURVE_SHARPNESS, t, curve);
+                            curve = ahap.FindCurveOnTime(JsonAHAP.CURVE_SHARPNESS, t, curve);
                         }
                         if (points.Count == 0)
                         {
@@ -194,7 +215,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             try
             {
-                HapticFile haptic = JsonConvert.DeserializeObject<HapticFile>(json);
+                JsonHaptic haptic = JsonConvert.DeserializeObject<JsonHaptic>(json);
                 Clear();
                 ImportHapticFile(haptic, dataFormat);
             }
@@ -204,7 +225,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
         }
 
-        private void ImportHapticFile(HapticFile haptic, DataFormat dataFormat = DataFormat.Linear)
+        private void ImportHapticFile(JsonHaptic haptic, DataFormat dataFormat = DataFormat.Linear)
         {
             var amplitudes = haptic.signals.continuous.envelopes.amplitude;
             var frequencies = haptic.signals.continuous.envelopes.frequency;
@@ -219,7 +240,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             List<EventPoint> points = new();
             foreach (var amplitude in amplitudes)
             {
-                points.Add(new EventPoint((float)amplitude.time, Mathf.Sqrt((float)amplitude.amplitude), ce));
+                points.Add(new EventPoint((float)amplitude.time, CalculateImportParameter((float)amplitude.amplitude, dataFormat), ce));
                 if (amplitude.emphasis != null)
                 {
                     _events.Add(new TransientEvent((float)amplitude.time,
@@ -256,14 +277,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _projectName = haptic.metadata.project;
         }
 
-        private float CalculateImportParameter(double input, DataFormat dataFormat)
+        private static float CalculateImportParameter(double value, DataFormat dataFormat)
         {
-            float floatInput = (float)input;
+            float floatInput = (float)value;
             return dataFormat switch
             {
                 DataFormat.Squared => Mathf.Sqrt(floatInput),
                 DataFormat.Power2_28 => Mathf.Pow(floatInput, 1 / 2.28f),
                 _ => floatInput,
+            };
+        }
+
+        private static double CalculateExportParameter(float value, DataFormat dataFormat)
+        {
+            return dataFormat switch
+            {
+                DataFormat.Squared => value * value,
+                DataFormat.Power2_28 => Mathf.Pow(value, 2.28f),
+                _ => value,
             };
         }
     }

@@ -16,8 +16,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             EventType = type;
             EventDuration = duration;
             EventParameters = new List<EventParameter>() {
-                    new EventParameter(AHAPFile.PARAM_INTENSITY, intensity),
-                    new EventParameter(AHAPFile.PARAM_SHARPNESS, sharpness)};
+                    new EventParameter(JsonAHAP.PARAM_INTENSITY, intensity),
+                    new EventParameter(JsonAHAP.PARAM_SHARPNESS, sharpness)};
         }
     }
 
@@ -97,7 +97,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (ParameterCurve != null && other.ParameterCurve != null)
             {
                 if (ParameterCurve.ParameterID != other.ParameterCurve.ParameterID)
-                    return ParameterCurve.ParameterID == AHAPFile.CURVE_INTENSITY ? -1 : 1;
+                    return ParameterCurve.ParameterID == JsonAHAP.CURVE_INTENSITY ? -1 : 1;
                 else
                     return ParameterCurve.Time.CompareTo(other.ParameterCurve.Time);
             }
@@ -106,7 +106,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         }
     }
 
-    internal class AHAPFile
+    internal class JsonAHAP
     {
         public const string EVENT_TRANSIENT = "HapticTransient";
         public const string EVENT_CONTINUOUS = "HapticContinuous";
@@ -119,7 +119,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public Metadata Metadata { get; set; }
         public List<Pattern> Pattern { get; set; }
 
-        public AHAPFile(double version, Metadata metadata, List<Pattern> pattern)
+        public JsonAHAP(double version, Metadata metadata, List<Pattern> pattern)
         {
             Version = version;
             Metadata = metadata;

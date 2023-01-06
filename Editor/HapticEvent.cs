@@ -11,9 +11,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
     {
         public float Time;
         public float Value;
-        public VibrationEvent ParentEvent;
+        public HapticEvent ParentEvent;
 
-        public EventPoint(float time, float value, VibrationEvent parent)
+        public EventPoint(float time, float value, HapticEvent parent)
         {
             Time = time;
             Value = value;
@@ -32,11 +32,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static implicit operator Vector2(EventPoint point) => new Vector2(point.Time, point.Value);
     }
 
-    internal abstract class VibrationEvent : IComparable<VibrationEvent>
+    internal abstract class HapticEvent : IComparable<HapticEvent>
     {
         public abstract float Time { get; }
 
-        public int CompareTo(VibrationEvent other)
+        public int CompareTo(HapticEvent other)
         {
             if (Time < other.Time) return -1;
             if (Time == other.Time) return 0;
@@ -52,7 +52,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public abstract List<Pattern> ToAHAP();
     }
 
-    internal class TransientEvent : VibrationEvent
+    internal class TransientEvent : HapticEvent
     {
         public EventPoint Intensity;
         public EventPoint Sharpness;
@@ -108,12 +108,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override List<Pattern> ToAHAP()
         {
-            Event e = new(Time, AHAPFile.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
+            Event e = new(Time, JsonAHAP.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
             return new List<Pattern>() { new Pattern(e, null) };
         }
     }
 
-    internal class ContinuousEvent : VibrationEvent
+    internal class ContinuousEvent : HapticEvent
     {
         public List<EventPoint> IntensityCurve;
         public List<EventPoint> SharpnessCurve;
@@ -197,12 +197,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             List<Pattern> list = new();
 
             // Event
-            Event e = new(Time, AHAPFile.EVENT_CONTINUOUS, IntensityCurve.Last().Time - Time, 1, 0);
+            Event e = new(Time, JsonAHAP.EVENT_CONTINUOUS, IntensityCurve.Last().Time - Time, 1, 0);
             list.Add(new Pattern(e, null));
 
             // Parameter curves
-            list.AddRange(CurveToPatterns(IntensityCurve, AHAPFile.CURVE_INTENSITY));
-            list.AddRange(CurveToPatterns(SharpnessCurve, AHAPFile.CURVE_SHARPNESS));
+            list.AddRange(CurveToPatterns(IntensityCurve, JsonAHAP.CURVE_INTENSITY));
+            list.AddRange(CurveToPatterns(SharpnessCurve, JsonAHAP.CURVE_SHARPNESS));
 
             return list;
         }

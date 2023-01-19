@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using DSPLib;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
@@ -67,6 +68,71 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             );
 
             method.Invoke(null, new object[] { });
+        }
+
+        public static float[] GetMonoSamples(AudioClip clip)
+        {
+            float[] multiChannelSamples = new float[clip.channels * clip.samples];
+            clip.GetData(multiChannelSamples, 0);
+            if (clip.channels == 1)
+                return multiChannelSamples;
+
+            float[] monoSamples = new float[clip.samples];
+            int numProcessed = 0;
+            float combinedChannelAverage = 0f;
+            for (int i = 0; i < multiChannelSamples.Length; i++)
+            {
+                combinedChannelAverage += multiChannelSamples[i];
+
+                if ((i + 1) % clip.channels == 0) // Average all channels sum
+                {
+                    monoSamples[numProcessed] = combinedChannelAverage / clip.channels;
+                    numProcessed++;
+                    combinedChannelAverage = 0f;
+                }
+            }
+            return monoSamples;
+        }
+
+        public static void CalculateSpectrum(AudioClip clip, out double[][] spectrum, out double[] frequencySpan, int chunkSize = 1024)
+        {
+            float[] monoSamples = GetMonoSamples(clip);
+            CalculateSpectrum(monoSamples, clip.frequency, out spectrum, out frequencySpan, chunkSize);
+        }
+
+        public static void CalculateSpectrum(float[] monoSamples, double samplingFrequencyHz,
+            out double[][] spectrum, out double[] frequencySpan, int chunkSize = 1024)
+        {
+            if (!((chunkSize != 0) && ((chunkSize & (chunkSize - 1)) == 0)))
+            {
+                Debug.LogError("Chunk size must be power of 2 > 0");
+                spectrum = Array.Empty<double[]>();
+                frequencySpan = Array.Empty<double>();
+                return;
+            }
+
+            FFT fft = new();
+            fft.Initialize((UInt32)chunkSize);
+            frequencySpan = fft.FrequencySpan(samplingFrequencyHz);
+            int iterations = monoSamples.Length / chunkSize;
+            spectrum = new double[iterations][];
+            double[] sampleChunk = new double[chunkSize];
+            for (int i = 0; i < iterations; i++)
+            {
+                // Grab the current chunk of audio sample data
+                Array.Copy(monoSamples, i * chunkSize, sampleChunk, 0, chunkSize);
+
+                // Apply FFT Window
+                double[] windowCoefs = DSP.Window.Coefficients(DSP.Window.Type.Hanning, (uint)chunkSize);
+                double[] scaledSpectrumChunk = DSP.Math.Multiply(sampleChunk, windowCoefs);
+                double scaleFactor = DSP.Window.ScaleFactor.Signal(windowCoefs);
+
+                // Perform the FFT and convert output (complex numbers) to Magnitude
+                System.Numerics.Complex[] fftSpectrum = fft.Execute(scaledSpectrumChunk);
+                double[] scaledFFTSpectrum = DSP.ConvertComplex.ToMagnitude(fftSpectrum);
+                scaledFFTSpectrum = DSP.Math.Multiply(scaledFFTSpectrum, scaleFactor);
+                spectrum[i] = scaledFFTSpectrum;
+            }
         }
     }
 }

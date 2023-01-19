@@ -24,7 +24,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         const float PLOT_EVENT_POINT_SIZE = 5f;
         const float PLOT_EVENT_LINE_WIDTH = 4f;
         const float PLOT_BORDER_WIDTH = 5f;
-        const float NEIGHBOURING_POINT_OFFSET = 0.001f;
+        const float NEIGHBOUR_POINT_OFFSET = 0.001f;
         const float MIN_WAVEFORM_RENDER_SCALE = 0.1f;
         const float MAX_WAVEFORM_RENDER_SCALE = 2f;
         const float LABEL_WIDTH_OFFSET = 3;
@@ -58,6 +58,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const string WINDOW_NAME = "AHAP Editor";
             public const string WINDOW_ICON_NAME = "d_HoloLensInputModule Icon";
             public const string PLAY_ICON_NAME = "d_PlayButton";
+            public const string STOP_ICON_NAME = "d_PreMatQuad";
 
             public static readonly GUIContent safeModeLabel = new("Safe Mode");
             public static readonly GUIContent debugModeLabel = new("Debug Mode");
@@ -102,6 +103,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent overwriteLabel = new("Overwrite");
             public static readonly GUIContent cancelLabel = new("Cancel");
             public static readonly GUIContent saveAsJsonLabel = new("Use .json Extension");
+            public static readonly GUIContent audioAnalysisLabel = new("Audio analysis");
         }
 
         class Styles

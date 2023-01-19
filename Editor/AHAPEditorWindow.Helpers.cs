@@ -93,7 +93,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         private bool IsTimeInView(float time)
         {
             float scrollTime = time / _time * _plotScrollSize.x;
-            return scrollTime >= _scrollPosition.x && scrollTime <= _scrollPosition.x + _plotScreenSize.x;
+            return scrollTime >= (_scrollPosition.x - NEIGHBOUR_POINT_OFFSET) &&
+                scrollTime <= _scrollPosition.x + _plotScreenSize.x + NEIGHBOUR_POINT_OFFSET;
         }
 
         private Vector3 PointToScrollCoords(float time, float value, float heightOffset = 0)
@@ -185,12 +186,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (amplitudes[0].time != 0)
             {
                 amplitudes.Insert(0, new Amplitude(0, 0));
-                amplitudes.Insert(1, new Amplitude(Mathf.Max((float)amplitudes[1].time - NEIGHBOURING_POINT_OFFSET, 0), 0));
+                amplitudes.Insert(1, new Amplitude(Mathf.Max((float)amplitudes[1].time - NEIGHBOUR_POINT_OFFSET, 0), 0));
             }
             if (frequencies[0].time != 0)
             {
                 frequencies.Insert(0, new Frequency(0, 0));
-                frequencies.Insert(1, new Frequency(Mathf.Max((float)frequencies[1].time - NEIGHBOURING_POINT_OFFSET, 0), 0));
+                frequencies.Insert(1, new Frequency(Mathf.Max((float)frequencies[1].time - NEIGHBOUR_POINT_OFFSET, 0), 0));
             }
 
             (Amplitude lastAmplitude, Frequency lastFrequency) = (amplitudes.Last(), frequencies.Last());
@@ -206,9 +207,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (transientEvents.Count > 0 && transientEvents.Last().Time > (float)amplitudes.Last().time) 
             {
                 TransientEvent lastTransient = transientEvents.Last();
-                amplitudes.Add(new Amplitude(lastAmplitude.time + NEIGHBOURING_POINT_OFFSET, 0));
+                amplitudes.Add(new Amplitude(lastAmplitude.time + NEIGHBOUR_POINT_OFFSET, 0));
                 amplitudes.Add(new Amplitude(lastTransient.Time, 0));
-                frequencies.Add(new Frequency(lastFrequency.time + NEIGHBOURING_POINT_OFFSET, 0));
+                frequencies.Add(new Frequency(lastFrequency.time + NEIGHBOUR_POINT_OFFSET, 0));
                 frequencies.Add(new Frequency(lastTransient.Time, 0));
             }
 

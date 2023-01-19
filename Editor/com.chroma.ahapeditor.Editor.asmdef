@@ -1,7 +1,9 @@
 {
     "name": "com.chroma.ahapeditor.Editor",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:dba75ab218643764685a2107a81b7f87"
+    ],
     "includePlatforms": [
         "Editor"
     ],

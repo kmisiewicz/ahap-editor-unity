@@ -25,16 +25,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     _fileInSlot = _overwrite = true;
                     string assetPath = AssetDatabase.GetAssetPath(asset);
                     string extension = Path.GetExtension(assetPath);
-                    switch (extension) 
+                    _fileFormat = extension switch
                     {
-                        case ".haptic":
-                            _fileFormat = FileFormat.Haptic; 
-                            break;
-                        case ".ahap":
-                        default:
-                            _fileFormat = FileFormat.AHAP;
-                            break;
-                    }
+                        ".haptic" => FileFormat.Haptic,
+                        _ => FileFormat.AHAP,
+                    };
                 }
             }
 

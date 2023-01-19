@@ -24,7 +24,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         string[] _pointDragModes, _mouseModes;
         bool _safeMode;
         GenericMenu _importFormatMenu;
-        Rect _saveButtonRect;
+        Rect _saveButtonRect, _transientGeneratorRect, _continuousGeneratorRect;
 
         // Mouse handling
         UnityEngine.Event _currentEvent;
@@ -44,6 +44,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Texture2D _waveformTexture;
         bool _waveformVisible, _waveformNormalize, _waveformShouldRepaint;
         float _waveformLastPaintedZoom, _waveformRenderScale;
+
+        // Audio analysis
+        TransientsOnsetsGeneratorData _lastTransientOnsetsGenData;
+        ContinuousRmsFftGeneratorData _lastContinuousRmsFftGenData;
 
         // Debug
         bool _debugMode, _drawRects;
@@ -414,11 +418,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 GUI.enabled = true;
                 if (GUILayout.Button(Content.saveLabel, topBarContainerHalfOption))
                 {
-                    Rect savePosition = GUILayoutUtility.GetLastRect();
-                    savePosition.position = position.position + CONTENT_MARGIN;
-                    savePosition.x += topBarContainerWidth * 0.5f;
-                    savePosition.y += lineWithSpacing * 3;
-                    savePosition.width = topBarContainerWidth;
                     PopupWindow.Show(_saveButtonRect, new SaveOptionsWindow(
                         (hasAsset, jsonExt, dataFormat, fileFormat) => HandleSaving(hasAsset, jsonExt, dataFormat, fileFormat),
                         _vibrationAsset));
@@ -443,16 +442,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (EditorGUI.EndChangeCheck())
                 {
                     AudioClipUtils.StopAllClips();
-                    _waveformVisible = false;
-                    if (_waveformClip != null && _waveformClip.length > MAX_TIME)
+                    if (_waveformVisible) _waveformShouldRepaint = true;
+                    if (_waveformClip != null)
                     {
-                        _waveformClip = null;
-                        EditorUtility.DisplayDialog("Clip too long", $"Selected audio clip is longer than max allowed {MAX_TIME}s.", "OK");
+                        if (_waveformClip.length > MAX_TIME)
+                        {
+                            _waveformClip = null;
+                            EditorUtility.DisplayDialog("Clip too long", $"Selected audio clip is longer than max allowed {MAX_TIME}s.", "OK");
+                        }
+                        else
+                            _time = _waveformClip.length;
                     }
                 }
                 GUI.enabled = _waveformClip != null;
                 if (GUILayout.Button(EditorGUIUtility.IconContent(Content.PLAY_ICON_NAME), EditorStyles.miniButton, GUILayout.MaxWidth(30)))
                     AudioClipUtils.PlayClip(_waveformClip);
+                if (GUILayout.Button(EditorGUIUtility.IconContent(Content.STOP_ICON_NAME), EditorStyles.miniButton, GUILayout.MaxWidth(30)))
+                    AudioClipUtils.StopAllClips();
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
@@ -833,6 +839,50 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                     GUILayout.Space(3);
                     EditorGUIUtility.labelWidth = 0;
+                }
+                GUILayout.EndVertical();
+
+                GUILayout.BeginVertical(GUI.skin.box);
+                {
+                    EditorGUILayout.LabelField(Content.audioAnalysisLabel, EditorStyles.boldLabel);
+
+                    GUI.enabled = _waveformClip != null;
+
+                    if (EditorGUILayout.DropdownButton(new GUIContent("Transients from onsets"), FocusType.Passive))
+                    {
+                        if (_lastTransientOnsetsGenData == null)
+                            _lastTransientOnsetsGenData = new TransientsOnsetsGeneratorData(_waveformClip);
+                        else 
+                            _lastTransientOnsetsGenData.Clip = _waveformClip;
+                        _lastTransientOnsetsGenData.OnHapticsGenerated = (events) => _events.AddRange(events);
+                        PopupWindow.Show(_transientGeneratorRect, 
+                            new TransientsOnsetsGenerator(_lastTransientOnsetsGenData, _transientGeneratorRect.width));
+                    }
+                    if (_currentEvent.type == EventType.Repaint) 
+                        _transientGeneratorRect = GUILayoutUtility.GetLastRect();
+
+                    GUILayout.Space(3);
+
+                    if (EditorGUILayout.DropdownButton(new GUIContent("Continuous with RMS and FFT"), FocusType.Passive))
+                    {
+                        if (_lastContinuousRmsFftGenData == null)
+                            _lastContinuousRmsFftGenData = new ContinuousRmsFftGeneratorData(_waveformClip);
+                        else
+                            _lastContinuousRmsFftGenData.Clip = _waveformClip;
+                        _lastContinuousRmsFftGenData.OnHapticsGenerated = (events) =>
+                        {
+                            _events.FindAll(e => e is ContinuousEvent).ForEach(e => _events.Remove(e));
+                            _events.AddRange(events);
+                        };
+                        PopupWindow.Show(_continuousGeneratorRect, 
+                            new ContinuousRmsFftGenerator(_lastContinuousRmsFftGenData, _continuousGeneratorRect.width));
+                    }
+                    if (_currentEvent.type == EventType.Repaint) 
+                        _continuousGeneratorRect = GUILayoutUtility.GetLastRect();
+
+                    GUI.enabled = true;
+
+                    GUILayout.Space(3);
                 }
                 GUILayout.EndVertical();
 

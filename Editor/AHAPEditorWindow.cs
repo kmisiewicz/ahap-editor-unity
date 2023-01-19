@@ -871,11 +871,23 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                             _lastContinuousRmsFftGenData.Clip = _waveformClip;
                         _lastContinuousRmsFftGenData.OnHapticsGenerated = (events) =>
                         {
+                            if (SafeMode && _events.Find(e => e is ContinuousEvent) != null)
+                                EditorUtils.ConfirmDialog(title: "Safe Mode warning",
+                                    message: "This will remove all continuous events. Proceed?", 
+                                    onOk: () => ReplaceContinuousHaptics(events));
+                            else
+                                ReplaceContinuousHaptics(events);
+                        };
+                        PopupWindow.Show(_continuousGeneratorRect,
+                            new ContinuousRmsFftGenerator(_lastContinuousRmsFftGenData, _continuousGeneratorRect.width));
+
+                        void ReplaceContinuousHaptics(List<HapticEvent> events)
+                        {
+                            _selectedPoints.Clear();
+                            _selectedPointsLocation = MouseLocation.Outside;
                             _events.FindAll(e => e is ContinuousEvent).ForEach(e => _events.Remove(e));
                             _events.AddRange(events);
-                        };
-                        PopupWindow.Show(_continuousGeneratorRect, 
-                            new ContinuousRmsFftGenerator(_lastContinuousRmsFftGenData, _continuousGeneratorRect.width));
+                        }
                     }
                     if (_currentEvent.type == EventType.Repaint) 
                         _continuousGeneratorRect = GUILayoutUtility.GetLastRect();

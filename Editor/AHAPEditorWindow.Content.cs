@@ -36,7 +36,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         static readonly Vector3 POINT_NORMAL = new(0, 0, 1);
         static readonly Vector2 CONTENT_MARGIN = new(3, 2);
 
-        class Colors
+        internal class Colors
         {
             public static readonly Color plotBorder = Color.white;
             public static readonly Color plotGrid = Color.gray;
@@ -53,7 +53,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly Color selectionRectBorder = new(0, 0.9f, 0.9f);
         }
 
-        class Content
+        internal class Content
         {
             public const string WINDOW_NAME = "AHAP Editor";
             public const string WINDOW_ICON_NAME = "d_HoloLensInputModule Icon";
@@ -103,10 +103,33 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIContent overwriteLabel = new("Overwrite");
             public static readonly GUIContent cancelLabel = new("Cancel");
             public static readonly GUIContent saveAsJsonLabel = new("Use .json Extension");
-            public static readonly GUIContent audioAnalysisLabel = new("Audio analysis");
+            public static readonly GUIContent generateLabel = new("Generate");
+            public static readonly GUIContent audioAnalysisLabel = new("Audio analysis",
+                "These algorithms can help you with haptics generation. " +
+                "Adjust the results yourself to achieve desired results.");
+            public static readonly GUIContent genTransChunkSizeLabel = new("Chunk Size",
+                "Audio samples will be split in chunks for calculations. " +
+                "Lower value will give more detail in time domain.");
+            public static readonly GUIContent genTransSensitivityLabel = new("Sensitivity",
+                "Spectral flux sample must be at least this times bigger than the average.");
+            public static readonly GUIContent genTransRmsThresholdLabel = new("RMS Threshold", 
+                "Only peaks above this RMS threshold will be kept.");
+            public static readonly GUIContent genContFilterLabel = new("Filter", 
+                "Frequency range for sharpness/frequency envelope generation.");
+            public static readonly GUIContent genContSimplificationLabel = new("Tolerance",
+                "This value is used to evaluate which points should be removed from the line. " +
+                "A higher value results in a simpler line (less points). " +
+                "A positive value close to zero results in a line with little to no reduction. " +
+                "A value of zero or less has no effect. Values below 0.1 recommended.");
+            public static readonly GUIContent genContRmsChunkSizeLabel = new("RMS Chunk",
+                "Audio samples will be split in chunks for calculations. " +
+                "Lower value will give more detail in time domain.");
+            public static readonly GUIContent genContFftChunkSizeLabel = new("FFT Chunk",
+                "Audio samples will be split in chunks for calculations. " +
+                "Lower value will give more detail in time domain but less frequency bins to work with.");
         }
 
-        class Styles
+        internal class Styles
         {
             public static readonly GUIStyle plotTitleStyle = new(EditorStyles.boldLabel) { alignment = TextAnchor.UpperCenter };
             public static readonly GUIStyle yAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleRight };

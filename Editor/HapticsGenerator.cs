@@ -75,13 +75,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override void DrawGeneratorDataGUI(Rect rect)
         {
-            _myData.ChunkSize = EditorGUILayout.IntField("Chunk Size", _myData.ChunkSize);
+            _myData.ChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genTransChunkSizeLabel,
+                _myData.ChunkSize);
 
-            _myData.Sensitivity = EditorGUILayout.Slider(new GUIContent("Sensitivity"), _myData.Sensitivity, 0, 1);
+            _myData.Sensitivity = EditorGUILayout.Slider(AHAPEditorWindow.Content.genTransSensitivityLabel,
+                _myData.Sensitivity, 0, 1);
 
-            _myData.RmsThreshold = EditorGUILayout.Slider(new GUIContent("RMS Threshold"), _myData.RmsThreshold, 0, 1);
+            _myData.RmsThreshold = EditorGUILayout.Slider(AHAPEditorWindow.Content.genTransRmsThresholdLabel,
+                _myData.RmsThreshold, 0, 1);
 
-            if (GUILayout.Button("Generate"))
+            if (GUILayout.Button(AHAPEditorWindow.Content.generateLabel))
             {
                 AudioToHaptics();
                 UnityEngine.Event.current.Use();
@@ -160,8 +163,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public int RmsChunkSize;
         public int FftChunkSize;
 
-        public ContinuousRmsFftGeneratorData(AudioClip clip, float bandpassFilterMin = 0, float simplification = 0.05f,
-            float bandpassFilterMax = 20000, int rmsChunkSize = 256, int fftChunkSize = 1024,
+        public ContinuousRmsFftGeneratorData(AudioClip clip, float bandpassFilterMin = 80, float bandpassFilterMax = 800,
+            int rmsChunkSize = 256, int fftChunkSize = 1024, float simplification = 0.05f,
             Action<List<HapticEvent>> onHapticsGenerated = null)
             : base(clip, onHapticsGenerated)
         {
@@ -174,6 +177,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
     internal class ContinuousRmsFftGenerator : HapticsGenerator
     {
+        const float MIN_FREQUENCY = 10;
+        const float MAX_FREQUENCY = 3000;
+
         ContinuousRmsFftGeneratorData _myData;
 
         public ContinuousRmsFftGenerator(ContinuousRmsFftGeneratorData myData, float windowWidth)
@@ -186,31 +192,31 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override void DrawGeneratorDataGUI(Rect rect)
         {
-            EditorGUILayout.MinMaxSlider("Filter", ref _myData.BandpassFilter.x, ref _myData.BandpassFilter.y, 0, 20000);
+            EditorGUILayout.MinMaxSlider(AHAPEditorWindow.Content.genContFilterLabel,
+                ref _myData.BandpassFilter.x, ref _myData.BandpassFilter.y, MIN_FREQUENCY, MAX_FREQUENCY);
 
             GUILayout.BeginHorizontal();
 
-            EditorGUI.BeginChangeCheck();
-            _myData.BandpassFilter.x = EditorGUILayout.FloatField(_myData.BandpassFilter.x);
-            if (EditorGUI.EndChangeCheck())
-                _myData.BandpassFilter.x = Mathf.Clamp(_myData.BandpassFilter.x, 0, _myData.BandpassFilter.x);
+            _myData.BandpassFilter.x = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.x),
+                MIN_FREQUENCY, _myData.BandpassFilter.y);
 
-            EditorGUI.BeginChangeCheck();
-            _myData.BandpassFilter.y = EditorGUILayout.FloatField(_myData.BandpassFilter.y);
-            if (EditorGUI.EndChangeCheck())
-                _myData.BandpassFilter.y = Mathf.Clamp(_myData.BandpassFilter.y, _myData.BandpassFilter.x, 20000);
+            _myData.BandpassFilter.y = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.y),
+                _myData.BandpassFilter.x, MAX_FREQUENCY);
 
             GUILayout.EndHorizontal();
 
             GUILayout.Space(3);
 
-            _myData.Simplification = EditorGUILayout.FloatField("Simplification", _myData.Simplification);
+            _myData.Simplification = EditorGUILayout.FloatField(AHAPEditorWindow.Content.genContSimplificationLabel,
+                _myData.Simplification);
 
-            _myData.RmsChunkSize = EditorGUILayout.IntField("RMS Chunk", _myData.RmsChunkSize);
+            _myData.RmsChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContRmsChunkSizeLabel,
+                _myData.RmsChunkSize);
 
-            _myData.FftChunkSize = EditorGUILayout.IntField("FFT Chunk", _myData.FftChunkSize);
+            _myData.FftChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContFftChunkSizeLabel,
+                _myData.FftChunkSize);
 
-            if (GUILayout.Button("Generate"))
+            if (GUILayout.Button(AHAPEditorWindow.Content.generateLabel))
             {
                 AudioToHaptics();
                 UnityEngine.Event.current.Use();

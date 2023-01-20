@@ -456,7 +456,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 GUI.enabled = _waveformClip != null;
                 if (GUILayout.Button(EditorGUIUtility.IconContent(Content.PLAY_ICON_NAME), EditorStyles.miniButton, GUILayout.MaxWidth(30)))
+                {
+                    AudioClipUtils.StopAllClips();
                     AudioClipUtils.PlayClip(_waveformClip);
+                }
                 if (GUILayout.Button(EditorGUIUtility.IconContent(Content.STOP_ICON_NAME), EditorStyles.miniButton, GUILayout.MaxWidth(30)))
                     AudioClipUtils.StopAllClips();
                 GUILayout.EndHorizontal();

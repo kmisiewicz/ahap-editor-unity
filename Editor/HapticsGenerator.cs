@@ -226,6 +226,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         protected override void AudioToHaptics()
         {
+            StringBuilder outputMessage = new($"[Continuous envelopes] ({_myData.Clip.name}):");
             float[] monoSamples = AudioClipUtils.GetMonoSamples(_myData.Clip);
             AudioClipUtils.CalculateSpectrum(monoSamples, _myData.Clip.frequency,
                 out double[][] spectrumOverTime, out double[] frequencySpan, _myData.FftChunkSize);
@@ -271,12 +272,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             List<Vector2> simplifiedRmsPoints = new();
-            List<Vector2> simplifiedFrequencyPoints = new();
             LineUtility.Simplify(rmsPoints, _myData.Simplification, simplifiedRmsPoints);
             if (simplifiedRmsPoints.Count < 2)
             {
                 simplifiedRmsPoints = rmsPoints;
-
+                outputMessage.AppendLine("Simplification error, returning full list of RMS points.");
             }
             else
             {
@@ -285,14 +285,26 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (simplifiedRmsPoints.Last().x != rmsPoints.Last().x)
                     simplifiedRmsPoints.Add(rmsPoints[0]);
             }
+            outputMessage.AppendLine($"RMS points: {rmsPoints.Count} => Simplified: {simplifiedRmsPoints.Count}");
+
+            List<Vector2> simplifiedFrequencyPoints = new();
             LineUtility.Simplify(frequencyPoints, _myData.Simplification, simplifiedFrequencyPoints);
             if (simplifiedFrequencyPoints.Count < 2)
+            {
                 simplifiedFrequencyPoints = frequencyPoints;
-            
-            ContinuousEvent ev = new();
-            ev.IntensityCurve = new List<EventPoint>();
+                outputMessage.AppendLine("Simplification error, returning full list of frequency points.");
+            }
+            else
+            {
+                if (simplifiedFrequencyPoints[0].x != frequencyPoints[0].x)
+                    simplifiedFrequencyPoints.Insert(0, frequencyPoints[0]);
+                if (simplifiedFrequencyPoints.Last().x != frequencyPoints.Last().x)
+                    simplifiedFrequencyPoints.Add(frequencyPoints[0]);
+            }
+            outputMessage.AppendLine($"Frequency points: {frequencyPoints.Count} => Simplified: {simplifiedFrequencyPoints.Count}");
+
+            ContinuousEvent ev = new() { IntensityCurve = new List<EventPoint>(), SharpnessCurve = new List<EventPoint>() };
             simplifiedRmsPoints.ForEach(point => ev.IntensityCurve.Add(new EventPoint(point.x, point.y, ev)));
-            ev.SharpnessCurve = new List<EventPoint>();
             simplifiedFrequencyPoints.ForEach(point => ev.SharpnessCurve.Add(new EventPoint(point.x, point.y, ev)));
             List<HapticEvent> events = new() { ev };
 

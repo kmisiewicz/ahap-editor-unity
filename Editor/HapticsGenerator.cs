@@ -4,6 +4,7 @@ using System.Text;
 using UnityEngine;
 using UnityEditor;
 using DSPLib;
+using System.Linq;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
@@ -244,33 +245,47 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             float currentChunkTime = 0f;
             float rmsChunkTime = 1f / _myData.Clip.frequency * _myData.RmsChunkSize;
             int iterations = _myData.Clip.samples / _myData.RmsChunkSize;
-            float[] audioChunk = new float[_myData.RmsChunkSize];
+            double[] audioChunk = new double[_myData.RmsChunkSize];
             for (i = 0; i < iterations; i++, currentChunkTime += rmsChunkTime)
             {
                 Array.Copy(monoSamples, i * _myData.RmsChunkSize, audioChunk, 0, _myData.RmsChunkSize);
-                double rms = DSP.Analyze.FindRms(Array.ConvertAll(audioChunk, x => (double)x), 1, 1);
-                rmsPoints.Add(new Vector2(currentChunkTime, (float)rms));
+                double rms = DSP.Analyze.FindRms(audioChunk, 1, 1);
+                rmsPoints.Add(new Vector2(currentChunkTime, Mathf.Clamp01((float)rms)));
             }
 
             currentChunkTime = 0f;
             float frequencyChunkTime = 1f / _myData.Clip.frequency * _myData.FftChunkSize;
             for (i = 0; i < spectrumOverTime.Length; i++, currentChunkTime += frequencyChunkTime)
             {
-
                 double[] filteredSpectrum = new double[filteredSpanLength];
                 Array.Copy(spectrumOverTime[i], minIndex, filteredSpectrum, 0, filteredSpanLength);
                 double f = DSP.Analyze.FindMaxFrequency(filteredSpectrum, filteredSpan);
                 f = (f - _myData.BandpassFilter.x) / (_myData.BandpassFilter.y - _myData.BandpassFilter.x);
-                frequencyPoints.Add(new Vector2(currentChunkTime, (float)f));
+                frequencyPoints.Add(new Vector2(currentChunkTime, Mathf.Clamp01((float)f)));
             }
 
-            List<Vector2> simplifiedRMSPoints = new();
+            List<Vector2> simplifiedRmsPoints = new();
             List<Vector2> simplifiedFrequencyPoints = new();
-            LineUtility.Simplify(rmsPoints, _myData.Simplification, simplifiedRMSPoints);
+            LineUtility.Simplify(rmsPoints, _myData.Simplification, simplifiedRmsPoints);
+            if (simplifiedRmsPoints.Count < 2)
+            {
+                simplifiedRmsPoints = rmsPoints;
+
+            }
+            else
+            {
+                if (simplifiedRmsPoints[0].x != rmsPoints[0].x)
+                    simplifiedRmsPoints.Insert(0, rmsPoints[0]);
+                if (simplifiedRmsPoints.Last().x != rmsPoints.Last().x)
+                    simplifiedRmsPoints.Add(rmsPoints[0]);
+            }
             LineUtility.Simplify(frequencyPoints, _myData.Simplification, simplifiedFrequencyPoints);
+            if (simplifiedFrequencyPoints.Count < 2)
+                simplifiedFrequencyPoints = frequencyPoints;
+            
             ContinuousEvent ev = new();
             ev.IntensityCurve = new List<EventPoint>();
-            simplifiedRMSPoints.ForEach(point => ev.IntensityCurve.Add(new EventPoint(point.x, point.y, ev)));
+            simplifiedRmsPoints.ForEach(point => ev.IntensityCurve.Add(new EventPoint(point.x, point.y, ev)));
             ev.SharpnessCurve = new List<EventPoint>();
             simplifiedFrequencyPoints.ForEach(point => ev.SharpnessCurve.Add(new EventPoint(point.x, point.y, ev)));
             List<HapticEvent> events = new() { ev };

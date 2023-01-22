@@ -212,8 +212,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _myData.RmsChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContRmsChunkSizeLabel,
                 _myData.RmsChunkSize);
 
-            _myData.FftChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContFftChunkSizeLabel,
+            EditorGUI.BeginChangeCheck();
+            _myData.FftChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContFftChunkSizeLabel, 
                 _myData.FftChunkSize);
+            if (EditorGUI.EndChangeCheck())
+                _myData.FftChunkSize = MathUtils.FindNextPowerOf2(_myData.FftChunkSize);
 
             if (GUILayout.Button(AHAPEditorWindow.Content.generateLabel))
             {

@@ -126,7 +126,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 "Lower value will give more detail in time domain.");
             public static readonly GUIContent genContFftChunkSizeLabel = new("FFT Chunk",
                 "Audio samples will be split in chunks for calculations. " +
-                "Lower value will give more detail in time domain but less frequency bins to work with.");
+                "Lower value will give more detail in time domain but less frequency bins to work with." +
+                "Must be power of 2.");
         }
 
         internal class Styles

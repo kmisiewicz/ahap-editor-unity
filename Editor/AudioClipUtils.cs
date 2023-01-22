@@ -14,22 +14,25 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
         {
             // Calculate samples
-            float[] samples = new float[audio.samples * audio.channels];
+            float[] samples = GetMonoSamples(audio);
             float[] waveform = new float[width];
-            audio.GetData(samples, 0);
-            int packSize = (samples.Length / width) + 1;
-            for (int i = 0, s = 0; i < samples.Length; i += packSize, s++)
-                waveform[s] = Mathf.Abs(samples[i]);
+            float chunkSize = samples.Length / (float)width;
+            int i;
+            for (i = 0; i < width; i++)
+            {
+                int index = Mathf.Clamp(Mathf.RoundToInt(i * chunkSize), 0, samples.Length);
+                waveform[i] = Mathf.Abs(samples[index]);
+            }
             if (normalize)
             {
                 float maxValue = waveform.Max();
-                for (int x = 0; x < width; x++)
-                    waveform[x] /= maxValue;
+                for (i = 0; i < width; i++)
+                    waveform[i] /= maxValue;
             }
 
             // Paint waveform
             Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
-            texture.SetPixels(Enumerable.Repeat(backgroundColor, width * height).ToArray());
+            texture.SetPixels32(Enumerable.Repeat((Color32)backgroundColor, width * height).ToArray());
             for (int x = 0; x < width; x++)
                 for (int y = 0; y <= waveform[x] * height; y++)
                     texture.SetPixel(x, y, waveformColor);

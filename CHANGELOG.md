@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2023-01-22
+### Added
+- Basic algorithms to automatically generate haptics:
+	- Transient events with onsets detection (base on [this article](https://medium.com/giant-scam/algorithmic-beat-mapping-in-unity-preprocessed-audio-analysis-d41c339c135a))
+	- Continuous envelopes generations from RMS and FFT
+- Window supports *.haptic* files now for both import and export
+- Import and export options have been added:
+	- Points can now be processed while importing or exporting:
+		- linear (default)
+		- power of 2
+		- power of 2.28 ([more info](https://danielbuettner.medium.com/10-things-you-should-know-about-designing-for-apple-core-haptics-9219fdebdcaa))
+	- While saving you can select output format - AHAP or Haptic, additionaly use *.json* extension
+- Safe Mode - shows warning dialog popups before critical operations, can be toggled in window's context menu
+- *Stop* button for audio clip
+
+### Changed
+- Zoom now respects mouse position
+- Tweaked UI
+
+### Fixed
+- Ending mouse drag outside plot while selecting points won't break the window
+- Point drag bounds won't display when only transient points are being moved
+- Point drag bounds are now properly calculated when using advanced panel
+
+
 ## [0.4.1] - 2022-12-08
 ### Changed
 - AHAP editor window will now auto-dock next to scene view

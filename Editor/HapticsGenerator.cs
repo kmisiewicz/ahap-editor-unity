@@ -4,7 +4,6 @@ using System.Text;
 using UnityEngine;
 using UnityEditor;
 using DSPLib;
-using System.Linq;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
@@ -282,10 +281,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (simplifiedRmsPoints[0].x != rmsPoints[0].x)
                     simplifiedRmsPoints.Insert(0, rmsPoints[0]);
-                if (simplifiedRmsPoints.Last().x != rmsPoints.Last().x)
-                    simplifiedRmsPoints.Add(rmsPoints[0]);
+                if (simplifiedRmsPoints[^1].x != rmsPoints[^1].x)
+                    simplifiedRmsPoints.Add(rmsPoints[^1]);
             }
-            outputMessage.AppendLine($"RMS points: {rmsPoints.Count} => Simplified: {simplifiedRmsPoints.Count}");
 
             List<Vector2> simplifiedFrequencyPoints = new();
             LineUtility.Simplify(frequencyPoints, _myData.Simplification, simplifiedFrequencyPoints);
@@ -298,9 +296,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (simplifiedFrequencyPoints[0].x != frequencyPoints[0].x)
                     simplifiedFrequencyPoints.Insert(0, frequencyPoints[0]);
-                if (simplifiedFrequencyPoints.Last().x != frequencyPoints.Last().x)
-                    simplifiedFrequencyPoints.Add(frequencyPoints[0]);
+                if (simplifiedFrequencyPoints[^1].x != frequencyPoints[^1].x)
+                    simplifiedFrequencyPoints.Add(frequencyPoints[^1]);
             }
+
+            if (simplifiedRmsPoints[^1].x > simplifiedFrequencyPoints[^1].x)
+                simplifiedFrequencyPoints.Add(new Vector2(simplifiedRmsPoints[^1].x, simplifiedFrequencyPoints[^1].y));
+            else if (simplifiedFrequencyPoints[^1].x > simplifiedRmsPoints[^1].x)
+                simplifiedRmsPoints.Add(new Vector2(simplifiedFrequencyPoints[^1].x, simplifiedRmsPoints[^1].y));
+
+            outputMessage.AppendLine($"RMS points: {rmsPoints.Count} => Simplified: {simplifiedRmsPoints.Count}");
             outputMessage.AppendLine($"Frequency points: {frequencyPoints.Count} => Simplified: {simplifiedFrequencyPoints.Count}");
 
             ContinuousEvent ev = new() { IntensityCurve = new List<EventPoint>(), SharpnessCurve = new List<EventPoint>() };
@@ -308,6 +313,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             simplifiedFrequencyPoints.ForEach(point => ev.SharpnessCurve.Add(new EventPoint(point.x, point.y, ev)));
             List<HapticEvent> events = new() { ev };
 
+            Debug.Log(outputMessage.ToString());
             _myData.OnHapticsGenerated?.Invoke(events);
         }
     }

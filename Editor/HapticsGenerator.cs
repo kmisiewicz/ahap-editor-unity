@@ -37,7 +37,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public abstract Vector2 CalculateWindowSize();
 
-        public abstract void DrawGeneratorDataGUI(Rect rect);
+        protected abstract void DrawGeneratorDataGUI(Rect rect);
 
         protected abstract void AudioToHaptics();
     }
@@ -72,7 +72,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public override Vector2 CalculateWindowSize() => GetSize(4);
 
-        public override void DrawGeneratorDataGUI(Rect rect)
+        protected override void DrawGeneratorDataGUI(Rect rect)
         {
             _myData.ChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genTransChunkSizeLabel,
                 _myData.ChunkSize);
@@ -157,20 +157,27 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
     internal class ContinuousRmsFftGeneratorData : HapticsGeneratorData
     {
-        public Vector2 BandpassFilter;
+        public bool NormalizeAudio;
         public float Simplification;
         public int RmsChunkSize;
+        public Vector2 BandpassFilter;
         public int FftChunkSize;
+        public bool MultiplyByRms;
+        public float LerpToRms;
 
-        public ContinuousRmsFftGeneratorData(AudioClip clip, float bandpassFilterMin = 80, float bandpassFilterMax = 800,
-            int rmsChunkSize = 256, int fftChunkSize = 1024, float simplification = 0.05f,
+        public ContinuousRmsFftGeneratorData(AudioClip clip, bool normalize = false, float simplification = 0.05f,
+            int rmsChunkSize = 256, float bandpassFilterMin = 80, float bandpassFilterMax = 800,
+            int fftChunkSize = 1024, bool multiplyByRms = false, float lerpToRms = 0,
             Action<List<HapticEvent>> onHapticsGenerated = null)
             : base(clip, onHapticsGenerated)
         {
-            BandpassFilter = new Vector2(bandpassFilterMin, bandpassFilterMax);
+            NormalizeAudio = normalize;
             Simplification = simplification;
             RmsChunkSize = rmsChunkSize;
+            BandpassFilter = new Vector2(bandpassFilterMin, bandpassFilterMax);
             FftChunkSize = fftChunkSize;
+            MultiplyByRms = multiplyByRms;
+            LerpToRms = lerpToRms;
         }
     }
 
@@ -187,36 +194,45 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _windowWidth = windowWidth;
         }
 
-        public override Vector2 CalculateWindowSize() => GetSize(6) + new Vector2(0, 3);
+        public override Vector2 CalculateWindowSize() => GetSize(12) + new Vector2(0, 12);
 
-        public override void DrawGeneratorDataGUI(Rect rect)
+        protected override void DrawGeneratorDataGUI(Rect rect)
         {
-            EditorGUILayout.MinMaxSlider(AHAPEditorWindow.Content.genContFilterLabel,
-                ref _myData.BandpassFilter.x, ref _myData.BandpassFilter.y, MIN_FREQUENCY, MAX_FREQUENCY);
-
-            GUILayout.BeginHorizontal();
-
-            _myData.BandpassFilter.x = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.x),
-                MIN_FREQUENCY, _myData.BandpassFilter.y);
-
-            _myData.BandpassFilter.y = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.y),
-                _myData.BandpassFilter.x, MAX_FREQUENCY);
-
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(3);
-
+            EditorGUILayout.LabelField(AHAPEditorWindow.Content.generalParamsLabel, EditorStyles.boldLabel);
+            _myData.NormalizeAudio = EditorGUILayout.Toggle(AHAPEditorWindow.Content.genContNormalizeLabel, 
+                _myData.NormalizeAudio);
             _myData.Simplification = EditorGUILayout.FloatField(AHAPEditorWindow.Content.genContSimplificationLabel,
                 _myData.Simplification);
 
+            GUILayout.Space(3);
+
+            EditorGUILayout.LabelField(AHAPEditorWindow.Content.intensityGenParamsLabel, EditorStyles.boldLabel);
             _myData.RmsChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContRmsChunkSizeLabel,
                 _myData.RmsChunkSize);
 
+            GUILayout.Space(3);
+
+            EditorGUILayout.LabelField(AHAPEditorWindow.Content.frequencyGenParamsLabel, EditorStyles.boldLabel);
+            EditorGUILayout.MinMaxSlider(AHAPEditorWindow.Content.genContFilterLabel,
+                ref _myData.BandpassFilter.x, ref _myData.BandpassFilter.y, MIN_FREQUENCY, MAX_FREQUENCY);
+            GUILayout.BeginHorizontal();
+            _myData.BandpassFilter.x = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.x),
+                MIN_FREQUENCY, _myData.BandpassFilter.y);
+            _myData.BandpassFilter.y = Mathf.Clamp(EditorGUILayout.FloatField(_myData.BandpassFilter.y),
+                _myData.BandpassFilter.x, MAX_FREQUENCY);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(3);
             EditorGUI.BeginChangeCheck();
             _myData.FftChunkSize = EditorGUILayout.IntField(AHAPEditorWindow.Content.genContFftChunkSizeLabel, 
                 _myData.FftChunkSize);
             if (EditorGUI.EndChangeCheck())
                 _myData.FftChunkSize = MathUtils.FindNextPowerOf2(_myData.FftChunkSize);
+            _myData.MultiplyByRms = EditorGUILayout.Toggle(AHAPEditorWindow.Content.genContMultByRmsLabel,
+                _myData.MultiplyByRms);
+            _myData.LerpToRms = EditorGUILayout.Slider(AHAPEditorWindow.Content.genContLerpToRmsLabel,
+                _myData.LerpToRms, 0, 1);
+
+            GUILayout.Space(3);
 
             if (GUILayout.Button(AHAPEditorWindow.Content.generateLabel))
             {
@@ -228,8 +244,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         protected override void AudioToHaptics()
         {
-            StringBuilder outputMessage = new($"[Continuous envelopes] ({_myData.Clip.name}):");
-            float[] monoSamples = AudioClipUtils.GetMonoSamples(_myData.Clip);
+            StringBuilder outputMessage = new($"[Continuous envelopes] ({_myData.Clip.name}):\n");
+            float[] monoSamples = AudioClipUtils.GetMonoSamples(_myData.Clip, _myData.NormalizeAudio);
             AudioClipUtils.CalculateSpectrum(monoSamples, _myData.Clip.frequency,
                 out double[][] spectrumOverTime, out double[] frequencySpan, _myData.FftChunkSize);
 
@@ -264,12 +280,21 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             currentChunkTime = 0f;
             float frequencyChunkTime = 1f / _myData.Clip.frequency * _myData.FftChunkSize;
+            double[] filteredSpectrum = new double[filteredSpanLength];
+            audioChunk = new double[_myData.FftChunkSize];
             for (i = 0; i < spectrumOverTime.Length; i++, currentChunkTime += frequencyChunkTime)
             {
-                double[] filteredSpectrum = new double[filteredSpanLength];
                 Array.Copy(spectrumOverTime[i], minIndex, filteredSpectrum, 0, filteredSpanLength);
                 double f = DSP.Analyze.FindMaxFrequency(filteredSpectrum, filteredSpan);
                 f = (f - _myData.BandpassFilter.x) / (_myData.BandpassFilter.y - _myData.BandpassFilter.x);
+                if (_myData.LerpToRms > 0 || _myData.MultiplyByRms)
+                {
+                    Array.Copy(monoSamples, i * _myData.FftChunkSize, audioChunk, 0, _myData.FftChunkSize);
+                    double rms = DSP.Analyze.FindRms(audioChunk, 1, 1);
+                    if (_myData.MultiplyByRms)
+                        f *= rms;
+                    f = (double)Mathf.Lerp((float)f, (float)rms, _myData.LerpToRms);
+                }
                 frequencyPoints.Add(new Vector2(currentChunkTime, Mathf.Clamp01((float)f)));
             }
 

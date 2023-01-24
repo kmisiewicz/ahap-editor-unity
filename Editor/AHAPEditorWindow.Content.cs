@@ -128,6 +128,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 "Audio samples will be split in chunks for calculations. " +
                 "Lower value will give more detail in time domain but less frequency bins to work with." +
                 "Must be power of 2.");
+            public static readonly GUIContent genContNormalizeLabel = new("Normalize",
+                "Normalize audio clip before further calculations.");
+            public static readonly GUIContent genContLerpToRmsLabel = new("Lerp to RMS",
+                "Interpolate between calculated value and RMS of each audio chunk.");
+            public static readonly GUIContent genContMultByRmsLabel = new("Multiply by RMS",
+                "Multiplies calculated frequency by RMS of each audio chunk.");
+            public static readonly GUIContent generalParamsLabel = new("General parameters");
+            public static readonly GUIContent intensityGenParamsLabel = new("Intensity generation");
+            public static readonly GUIContent frequencyGenParamsLabel = new("Frequency generation");
         }
 
         internal class Styles

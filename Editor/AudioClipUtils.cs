@@ -14,22 +14,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
         {
             // Calculate samples
-            float[] samples = new float[audio.samples * audio.channels];
+            float[] samples = GetMonoSamples(audio, normalize);
             float[] waveform = new float[width];
-            audio.GetData(samples, 0);
-            int packSize = (samples.Length / width) + 1;
-            for (int i = 0, s = 0; i < samples.Length; i += packSize, s++)
-                waveform[s] = Mathf.Abs(samples[i]);
-            if (normalize)
+            float chunkSize = samples.Length / (float)width;
+            int i;
+            for (i = 0; i < width; i++)
             {
-                float maxValue = waveform.Max();
-                for (int x = 0; x < width; x++)
-                    waveform[x] /= maxValue;
+                int index = Mathf.Clamp(Mathf.RoundToInt(i * chunkSize), 0, samples.Length);
+                waveform[i] = Mathf.Abs(samples[index]);
             }
 
             // Paint waveform
             Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
-            texture.SetPixels(Enumerable.Repeat(backgroundColor, width * height).ToArray());
+            texture.SetPixels32(Enumerable.Repeat((Color32)backgroundColor, width * height).ToArray());
             for (int x = 0; x < width; x++)
                 for (int y = 0; y <= waveform[x] * height; y++)
                     texture.SetPixel(x, y, waveformColor);
@@ -70,16 +67,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             method.Invoke(null, new object[] { });
         }
 
-        public static float[] GetMonoSamples(AudioClip clip)
+        public static float[] GetMonoSamples(AudioClip clip, bool normalize = false)
         {
             float[] multiChannelSamples = new float[clip.channels * clip.samples];
             clip.GetData(multiChannelSamples, 0);
-            if (clip.channels == 1)
-                return multiChannelSamples;
 
             float[] monoSamples = new float[clip.samples];
             int numProcessed = 0;
             float combinedChannelAverage = 0f;
+            float maxValue = 0;
             for (int i = 0; i < multiChannelSamples.Length; i++)
             {
                 combinedChannelAverage += multiChannelSamples[i];
@@ -87,10 +83,18 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if ((i + 1) % clip.channels == 0) // Average all channels sum
                 {
                     monoSamples[numProcessed] = combinedChannelAverage / clip.channels;
+                    maxValue = Mathf.Max(maxValue, monoSamples[numProcessed]);
                     numProcessed++;
                     combinedChannelAverage = 0f;
                 }
             }
+
+            if (normalize)
+            {
+                for (int i = 0; i < monoSamples.Length; i++)
+                    monoSamples[i] /= maxValue;
+            }
+
             return monoSamples;
         }
 

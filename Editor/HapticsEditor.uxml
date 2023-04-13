@@ -1,0 +1,130 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/com.chroma.ahapeditor/Editor/HapticsEditor.uss?fileID=7433441132597879392&amp;guid=379c47a84a5ba1b4bb32a076d8995460&amp;type=3#HapticsEditor" />
+    <ui:VisualElement name="topBar" class="options-bar" style="flex-direction: row;">
+        <ui:VisualElement name="filePanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
+            <ui:Label text="File" name="fileLabel" class="label-normal" style="-unity-font-style: bold;" />
+            <uie:ObjectField label="Asset" allow-scene-objects="false" name="assetField" type="UnityEngine.Object, UnityEngine.CoreModule" class="short-field-label" />
+            <ui:VisualElement name="fileOperations" style="flex-direction: row;">
+                <ui:Button text="Import" name="importButton" class="button-array-left" style="flex-shrink: 1; width: 50%;" />
+                <ui:Button text="Save" display-tooltip-when-elided="true" name="saveButton" class="button-array-right" style="flex-shrink: 1; width: 50%;" />
+            </ui:VisualElement>
+            <ui:TextField picking-mode="Ignore" label="Project Name" name="projectNameField" class="short-field-label" style="opacity: 1; display: none; visibility: visible; overflow: hidden;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="wavePanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top" style="overflow: visible;">
+            <ui:Label text="Waveform" name="waveLabel" class="label-normal" style="-unity-font-style: bold;" />
+            <ui:VisualElement name="waveContainer" style="flex-direction: row; overflow: hidden; align-items: center;">
+                <uie:ObjectField name="waveformField" type="UnityEngine.AudioClip, UnityEngine.AudioModule" allow-scene-objects="false" style="flex-shrink: 1; align-items: flex-start; margin-right: 0;" />
+                <ui:Button display-tooltip-when-elided="true" name="playButton" class="button-array-left" style="height: 90%; margin-top: 0; margin-bottom: 0;">
+                    <ui:Image name="playIcon" class="button-image" style="--unity-image: resource(&apos;d_PlayButton&apos;); flex-shrink: 0; margin-left: -1px; margin-right: -1px; margin-top: -1px; margin-bottom: -1px;" />
+                </ui:Button>
+                <ui:Button display-tooltip-when-elided="true" name="stopButton" class="button-array-right" style="height: 90%; margin-top: 0; margin-bottom: 0;">
+                    <ui:Image name="stopIcon" class="button-image" style="--unity-image: resource(&apos;d_PreMatQuad&apos;);" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement name="waveVisibility" style="flex-direction: row;">
+                <uie:ToolbarToggle focusable="false" label="Visible" name="waveVisibleToggle" class="toggle-button button-array-left toggle-button-label toggle-button-checkmark" style="width: 50%;" />
+                <uie:ToolbarToggle focusable="false" label="Normalize" name="waveNormalizeToggle" class="toggle-button button-array-right toggle-button-label toggle-button-checkmark" style="width: 50%;" />
+            </ui:VisualElement>
+            <uie:FloatField label="Render Scale" value="1" name="waveRenderScale" is-delayed="true" class="short-field-label" />
+        </ui:VisualElement>
+        <ui:VisualElement name="plotViewPanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
+            <ui:Label text="Plot View" name="plotViewLabel" class="label-normal" style="-unity-font-style: bold;" />
+            <ui:VisualElement name="zoomControl" style="flex-direction: row; overflow: hidden;">
+                <ui:Slider picking-mode="Ignore" label="Zoom" value="1" high-value="7" low-value="1" show-input-field="true" name="zoom" class="short-field-label slider-text-field" style="margin-top: 0; margin-bottom: 0; flex-grow: 1; flex-shrink: 1; overflow: hidden;" />
+                <ui:Button text="Reset" display-tooltip-when-elided="true" name="zoomResetButton" style="flex-shrink: 1; width: 30%; margin-top: 0; margin-bottom: 0;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="timeControl" style="flex-direction: row;">
+                <uie:FloatField label="Time" value="1" name="timeValue" class="short-field-label" style="flex-shrink: 1; flex-grow: 1;" />
+                <ui:Button text="Trim" display-tooltip-when-elided="true" name="trimButton" style="width: 30%; flex-shrink: 1;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="pointEditingPanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
+            <ui:Label text="Point Editing" name="plotViewLabel" class="label-normal" style="-unity-font-style: bold;" />
+            <ui:RadioButtonGroup value="0" choices="Add/Remove,Select" name="mouseModeRadioGroup" class="radio-button-strip-input radio-button-strip-button radio-button-strip-container radio-button-strip-checkmark unity-button-strip-button-label" />
+            <ui:VisualElement name="mouseMode" style="flex-direction: row; display: none;">
+                <uie:ToolbarToggle focusable="true" label="Add/Remove" name="addRemoveModeToggle" class="toggle-button-label toggle-button toggle-button-checkmark button-strip-left" style="padding-left: 6px; padding-right: 6px; left: auto; width: 50%; margin-top: 0; margin-bottom: 1px;" />
+                <uie:ToolbarToggle focusable="true" label="Select" name="selectModeToggle" class="toggle-button-label toggle-button toggle-button-checkmark button-array-right button-strip-right" style="padding-left: 6px; padding-right: 6px; padding-bottom: 1px; left: auto; width: 50%; margin-top: 0; margin-bottom: 1px;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="otherButtons" style="flex-direction: row; flex-grow: 1;">
+                <uie:ToolbarToggle focusable="false" label="Advanced Panel" name="advancedPanelToggle" class="toggle-button toggle-button-checkmark button-array-left toggle-button-label-wrap" style="flex-shrink: 1; margin-top: 0; width: 50%;" />
+                <ui:Button text="Clear" display-tooltip-when-elided="true" name="clearButton" class="button-array-right" style="flex-shrink: 1; margin-top: 0; width: 50%;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:TwoPaneSplitView name="bottomPart" fixed-pane-index="1" fixed-pane-initial-dimension="300" class="dragline-vertical" style="overflow: visible; flex-grow: 1;">
+        <ui:VisualElement name="plotPanel" usage-hints="DynamicColor" class="top-bar options-bar" style="overflow: visible; flex-direction: row;">
+            <ui:VisualElement name="yAxisLabelsContainer" style="width: 30px; flex-shrink: 0;">
+                <ui:VisualElement name="amplitudePlotYLabels" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); align-items: flex-end; padding-right: 3px;" />
+                <ui:VisualElement name="frequencyPlotYLabels" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); align-items: flex-end; padding-right: 3px;" />
+            </ui:VisualElement>
+            <ui:ScrollView mode="Horizontal" vertical-scroller-visibility="Hidden" horizontal-scroller-visibility="AlwaysVisible" name="plotScroll" elasticity="0" scroll-deceleration-rate="0" class="scroll-vertical-direction" style="flex-grow: 1;">
+                <ui:VisualElement name="amplitudePlotContainer" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-basis: 0; -unity-text-align: upper-center; -unity-font-style: bold;">
+                    <ui:Label tabindex="-1" text="Amplitude/Intensity" display-tooltip-when-elided="true" name="amplitudeLabel" class="label-normal" />
+                    <ui:VisualElement name="amplitudePlot" class="plot-border">
+                        <ui:Image name="amplitudePlotWaveform" style="height: 100%;" />
+                        <ui:VisualElement name="amplitudePlotPoints" style="position: absolute; width: 100%; height: 100%;" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="amplitudePlotXAxisLabels" style="background-color: rgba(0, 0, 0, 0); height: 18px;" />
+                </ui:VisualElement>
+                <ui:VisualElement name="frequencyPlotContainer" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-basis: 0;">
+                    <ui:Label tabindex="-1" text="Frequency/Sharpness" display-tooltip-when-elided="true" name="frequencyLabel" class="label-normal" style="-unity-font-style: bold; -unity-text-align: upper-center;" />
+                    <ui:VisualElement name="frequencyPlot" class="plot-border" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                        <ui:Image name="frequencyPlotWaveform" style="height: 100%;" />
+                        <ui:VisualElement name="frequencyPlotPoints" style="position: absolute; width: 100%; height: 100%;" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="frequencyPlotXAxisLabels" style="background-color: rgba(0, 0, 0, 0); height: 18px;" />
+                </ui:VisualElement>
+            </ui:ScrollView>
+            <ui:VisualElement style="flex-shrink: 0; width: 10px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="advancedPanel" usage-hints="DynamicColor" class="options-bar" style="overflow: visible; display: flex; flex-direction: column;">
+            <ui:VisualElement name="selectionPanel" class="options-bar-panel">
+                <ui:Label text="Selection" name="selectionLabel" class="label-normal" style="-unity-font-style: bold;" />
+                <ui:FloatField label="Time" value="0.5" name="selectionTimeField" style="display: none;" />
+                <ui:FloatField label="Sharpness" value="0.5" name="selectionValueField" style="display: none;" />
+                <ui:Label tabindex="-1" text="No" display-tooltip-when-elided="true" name="selectionLabelTop" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
+                <ui:Label tabindex="-1" text="selection" display-tooltip-when-elided="true" name="selectionLabelBottom" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
+            </ui:VisualElement>
+            <ui:VisualElement name="mouseOptionsPanel" class="options-bar-panel">
+                <ui:Label text="Mouse Options" name="mouseOptionsLabel" class="label-normal" style="-unity-font-style: bold;" />
+                <ui:VisualElement name="mouseOptionsContainer" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
+                    <ui:VisualElement name="mouseOptionsLabels" style="background-color: rgba(0, 0, 0, 0);">
+                        <ui:Label tabindex="-1" text="Dragging" name="pointDragModeLabel" display-tooltip-when-elided="true" class="label-normal" style="margin-right: 0;" />
+                        <ui:Label tabindex="-1" text="Snapping" name="snappingLabel" display-tooltip-when-elided="true" class="label-normal" style="margin-right: 0;" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="mouseOptionsFields" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                        <ui:RadioButtonGroup value="0" choices="Free Move, Lock Time, Lock Value" name="pointDragRadioGroup" class="radio-button-strip-container radio-button-strip-button radio-button-strip-checkmark unity-button-strip-button-label radio-button-strip-input" />
+                        <ui:EnumField type="Chroma.Utility.Haptics.AHAPEditor.AHAPEditorWindow+SnapMode, com.chroma.ahapeditor.Editor" value="None" name="snappingEnum" class="short-field-label" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="audioAnalysisPanel" class="options-bar-panel">
+                <ui:Label text="Audio Analysis" name="audioAnalysisLabel" class="label-normal" style="-unity-font-style: bold;" />
+                <ui:Button display-tooltip-when-elided="true" text="Transients" name="transientsAnalysisButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
+                    <ui:Label tabindex="-1" text="Transients from onsets" display-tooltip-when-elided="true" name="transientsAnalysisLabel" class="label-button" />
+                    <ui:Image name="dropdownArrow" class="button-image" style="--unity-image: resource(&apos;d_icon dropdown&apos;); height: 18px; margin-top: -2px; margin-bottom: -1px;" />
+                </ui:Button>
+                <ui:Button display-tooltip-when-elided="true" text="Continuous" name="continuousAnalysisButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
+                    <ui:Label tabindex="-1" text="Continuous envelope" display-tooltip-when-elided="true" name="continuousAnalysisButton" class="label-button" />
+                    <ui:Image name="dropdownArrow" class="button-image" style="--unity-image: resource(&apos;d_icon dropdown&apos;); height: 18px; margin-top: -2px; margin-bottom: -1px;" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);" />
+            <ui:VisualElement name="hoverInfo" class="options-bar-panel" style="flex-grow: 0;">
+                <ui:Label text="Hover Info" name="hoverInfoLabel" class="label-normal" style="-unity-font-style: bold;" />
+                <ui:VisualElement name="hoverPlot" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row; justify-content: space-between;">
+                    <ui:Label text="Plot" name="hoverPlotLabel" class="label-normal" />
+                    <ui:Label text="-" name="hoverPlotName" class="label-normal" style="-unity-text-align: upper-right;" />
+                </ui:VisualElement>
+                <ui:VisualElement name="hoverTime" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row; justify-content: space-between;">
+                    <ui:Label text="Time" name="hoverTimeLabel" class="label-normal" />
+                    <ui:Label text="-" name="hoverTimeNumber" class="label-normal" style="-unity-text-align: upper-right;" />
+                </ui:VisualElement>
+                <ui:VisualElement name="hoverValue" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row; justify-content: space-between;">
+                    <ui:Label text="Value" name="hoverValueLabel" class="label-normal" />
+                    <ui:Label text="-" name="hoverValueNumber" class="label-normal" style="-unity-text-align: upper-right;" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:TwoPaneSplitView>
+</ui:UXML>

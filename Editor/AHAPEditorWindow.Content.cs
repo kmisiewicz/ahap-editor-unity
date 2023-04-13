@@ -146,7 +146,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly GUIStyle xAxisLabelStyle = new(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
         }
 
-        enum SnapMode
+        internal enum SnapMode
         {
             None = 0,
             [InspectorName("0.1")] Tenth = 1,
@@ -154,11 +154,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             [InspectorName("0.001")] Thousandth = 3
         }
 
-        enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
+        internal enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
 
         enum MouseButton { Left = 0, Right = 1, Middle = 2 }
 
-        enum MouseMode { AddRemove = 0, Select = 1, None = -1 }
+        enum MouseMode 
+        { 
+            None = -1 ,
+            [InspectorName("Add/Remove")] AddRemove = 0,
+            Select = 1
+        }
 
         enum DataFormat 
         { 

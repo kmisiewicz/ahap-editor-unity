@@ -7,12 +7,15 @@ using DSPLib;
 
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    internal class AudioClipUtils
+    internal static class AudioClipUtils
     {
         // Adjusted code from answers
         // https://answers.unity.com/questions/699595/how-to-generate-waveform-from-audioclip.html
         public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
         {
+            if (width <= 0 || height <= 0)
+                return null;
+
             // Calculate samples
             float[] samples = GetMonoSamples(audio, normalize);
             float[] waveform = new float[width];
@@ -39,6 +42,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         // https://forum.unity.com/threads/way-to-play-audio-in-editor-using-an-editor-script.132042/#post-7015753
         public static void PlayClip(AudioClip clip, int startSample = 0, bool loop = false)
         {
+            if (clip == null) 
+                return;
+
             Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
             Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
             MethodInfo method = audioUtilClass.GetMethod(

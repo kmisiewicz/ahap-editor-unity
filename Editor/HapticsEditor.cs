@@ -507,7 +507,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (_amplitudeMousePosition != null)
             {
                 Vector2 amplitudeMousePosition = _amplitudeMousePosition.Value;
-                if (context.visualElement.ContainsPoint(amplitudeMousePosition))
+                if (VisualElementContainsPoint(context.visualElement, amplitudeMousePosition))
                 {
                     DrawHoverGuides(context, amplitudeMousePosition);
                     if (_mouseState == MouseState.Dragging)
@@ -569,7 +569,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (_frequencyMousePosition != null) 
             {
                 Vector2 frequencyMousePosition = _frequencyMousePosition.Value;
-                if (context.visualElement.ContainsPoint(frequencyMousePosition))
+                if (VisualElementContainsPoint(context.visualElement, frequencyMousePosition))
                 {
                     DrawHoverGuides(context, frequencyMousePosition);
                     if (_mouseState == MouseState.Dragging)
@@ -660,15 +660,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void AmplitudePlot_PointerDown(PointerDownEvent pointerDownEvent)
         {
-            pointerDownEvent.target.CapturePointer(0);
+            var amplitudePlot = (VisualElement)pointerDownEvent.target;
+            amplitudePlot.CapturePointer(0);
             _mouseState = MouseState.Clicked;
-            _dragStartPosition = pointerDownEvent.localPosition;
+            _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, amplitudePlot.worldBound.size);
         }
 
         void AmplitudePlot_PointerUp(PointerUpEvent pointerUpEvent)
         {
             var amplitudePlot = (VisualElement)pointerUpEvent.target;
-            if (_amplitudeMousePosition != null && !amplitudePlot.ContainsPoint(_amplitudeMousePosition.Value))
+            if (_amplitudeMousePosition != null && !VisualElementContainsPoint(amplitudePlot, _amplitudeMousePosition.Value))
             {
                 HandlePlotPointerHover(amplitudePlot, null,
                     ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
@@ -686,7 +687,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 Vector2 plotSize = amplitudePlot.worldBound.size;
                 if (_mouseState == MouseState.Clicked)
                 {
-                    Vector2 point = PlotToRealPoint(pointerUpEvent.localPosition, plotSize);
+                    Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotSize);
                     if (TryGetContinuousEvent(point.x, out ContinuousEvent ce))
                         ce.AddPointToCurve(point, MouseLocation.IntensityPlot);
                     else
@@ -695,7 +696,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 else if (_mouseState == MouseState.Dragging)
                 {
                     Vector2 firstPoint = PlotToRealPoint(_dragStartPosition.Value, plotSize);
-                    Vector2 secondPoint = PlotToRealPoint(pointerUpEvent.localPosition, plotSize);
+                    Vector2 secondPoint = SnapPointerPosition(pointerUpEvent.localPosition, plotSize);
+                    secondPoint = PlotToRealPoint(secondPoint, plotSize);
                     if (secondPoint.x < firstPoint.x)
                         (firstPoint, secondPoint) = (secondPoint, firstPoint);
 
@@ -707,6 +709,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             amplitudePlot.ReleasePointer(0);
+            _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
         }
 
@@ -735,15 +738,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void FrequencyPlot_PointerDown(PointerDownEvent pointerDownEvent)
         {
-            pointerDownEvent.target.CapturePointer(0);
+            var frequencyPlot = (VisualElement)pointerDownEvent.target;
+            frequencyPlot.CapturePointer(0);
             _mouseState = MouseState.Clicked;
-            _dragStartPosition = pointerDownEvent.localPosition;
+            _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, frequencyPlot.worldBound.size);
         }
 
         void FrequencyPlot_PointerUp(PointerUpEvent pointerUpEvent) 
         {
             var frequencyPlot = (VisualElement)pointerUpEvent.target;
-            if (_frequencyMousePosition != null && !frequencyPlot.ContainsPoint(_frequencyMousePosition.Value))
+            if (_frequencyMousePosition != null && !VisualElementContainsPoint(frequencyPlot, _frequencyMousePosition.Value))
             {
                 HandlePlotPointerHover(frequencyPlot, null,
                     ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
@@ -782,6 +786,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             frequencyPlot.ReleasePointer(0);
+            _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
         }
 
@@ -900,10 +905,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             foreach (var ev in _Events)
             {
-                if (ev is ContinuousEvent ce && (time1 <= ce.IntensityCurve[^1].Time && time2 >= ce.Time))
+                if (ev is ContinuousEvent ce && (time2 >= ce.Time && time1 <= ce.IntensityCurve[^1].Time))
                     return true;
             }
             return false;
+        }
+
+        static bool VisualElementContainsPoint(VisualElement visualElement, Vector2 point)
+        {
+            Vector2 size = visualElement.worldBound.size;
+            return point.x >= 0 && point.x <= size.x && point.y >=0 && point.y <= size.y;
         }
     }
 }

@@ -6,7 +6,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
     internal static class Painter2DExtensions
     {
         public static void DrawLine(this Painter2D painter, float? width = null, Color? color = null,
-            bool closePath = false, params Vector2[] points)
+            bool closePath = false, LineJoin? lineJoin = null, params Vector2[] points)
         {
             if (points.Length < 2)
                 return;
@@ -15,6 +15,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 painter.lineWidth = width.Value;
             if (color.HasValue)
                 painter.strokeColor = color.Value;
+            if (lineJoin.HasValue)
+                painter.lineJoin = lineJoin.Value;
+
             painter.BeginPath();
             painter.MoveTo(points[0]);
             for (int i = 1; i < points.Length; i++)
@@ -51,6 +54,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 painter.fillColor = color.Value;
             painter.BeginPath();
             painter.Arc(center, radius, 0, 360);
+            painter.Fill();
+        }
+
+        public static void DrawPolygon(this Painter2D painter, Color? color = null, bool closePath = false, params Vector2[] points)
+        {
+            if (points.Length < (closePath ? 3 : 4))
+                return;
+
+            if (color.HasValue)
+                painter.fillColor = color.Value;
+            painter.BeginPath();
+            painter.MoveTo(points[0]);
+            for (int i = 1; i < points.Length; i++)
+                painter.LineTo(points[i]);
+            if (closePath)
+                painter.ClosePath();
             painter.Fill();
         }
     }

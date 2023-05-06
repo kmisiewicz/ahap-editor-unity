@@ -722,11 +722,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         
         void FrequencyPlot_PointerMoved(PointerMoveEvent pointerMoveEvent)
         {
+            if (_mouseState == MouseState.Clicked)
+            {
+                Vector2 point = PlotToRealPoint(_dragStartPosition.Value, ((VisualElement)pointerMoveEvent.target).worldBound.size);
+                _mouseState = TryGetContinuousEvent(point.x, out _) ? MouseState.Unclicked : MouseState.Dragging;
+            }
+
             if (_amplitudeMousePosition == null)
                 HandlePlotPointerHover(pointerMoveEvent.target, pointerMoveEvent.localPosition,
                     ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-            if (_mouseState == MouseState.Clicked)
-                _mouseState = MouseState.Dragging;
         }
 
         void FrequencyPlot_PointerOut(PointerOutEvent pointerOutEvent)

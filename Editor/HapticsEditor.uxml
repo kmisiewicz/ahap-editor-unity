@@ -25,7 +25,10 @@
                 <uie:ToolbarToggle focusable="false" label="Visible" name="waveVisibleToggle" class="toggle-button button-array-left toggle-button-label toggle-button-checkmark" style="width: 50%;" />
                 <uie:ToolbarToggle focusable="false" label="Normalize" name="waveNormalizeToggle" class="toggle-button button-array-right toggle-button-label toggle-button-checkmark" style="width: 50%;" />
             </ui:VisualElement>
-            <uie:FloatField label="Render Scale" value="1" name="waveRenderScale" is-delayed="true" class="short-field-label" />
+            <ui:VisualElement name="waveParams" style="flex-grow: 0; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
+                <uie:FloatField label="Quality" value="1" name="waveRenderScale" is-delayed="true" class="short-field-label" style="width: 50%; flex-shrink: 1; flex-grow: 1;" />
+                <ui:FloatField label="H Multiplier" value="1" view-data-key="waveHeightMultiplier" name="waveHeightMultiplier" is-delayed="true" class="short-field-label" style="width: 50%; flex-shrink: 1; flex-grow: 1;" />
+            </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="plotViewPanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
             <ui:Label text="Plot View" name="plotViewLabel" class="label-normal" style="-unity-font-style: bold;" />

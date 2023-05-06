@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEditor.UIElements;
 using PopupWindow = UnityEditor.PopupWindow;
 using Object = UnityEngine.Object;
+using Chroma.UIToolkit.Utility;
 
 //TODO: remove AHAPEditor from name and namespace
 //TODO: fold queries with 1 change to one line
@@ -38,6 +39,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const string WaveformVisible = "waveVisibleToggle";
             public const string WaveformNormalize = "waveNormalizeToggle";
             public const string WaveformRenderScale = "waveRenderScale";
+            public const string WaveformHeightMultiplier = "waveHeightMultiplier";
 
             public const string ZoomField = "zoom";
             public const string ZoomResetButton = "zoomResetButton";
@@ -80,6 +82,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const float WaveformRepaintTimeThreshold = 0.2f;
             public const float WaveformRenderScaleMin = 0.1f;
             public const float WaveformRenderScaleMax = 2f;
+            public const float WaveformHeightMultiplierMin = 0.1f;
+            public const float WaveformHeightMultiplierMax = 3f;
             public const float TimeMin = 0.1f;
             public const float TimeMax = 30f;
             public const float TimeDefault = 1f;
@@ -100,12 +104,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public static readonly Color eventTransient = new(0.22f, 0.6f, 1f);
             public static readonly Color eventContinuous = new(1f, 0.6f, 0.2f);
             public static readonly Color eventContinuousCreation = new(1f, 0.6f, 0.2f, 0.5f);
-            public static readonly Color hoverPoint = new(0.8f, 0.8f, 0.8f, 0.2f);
-            public static readonly Color draggedPoint = new(1f, 1f, 0f, 0.3f);
+            public static readonly Color hovered = new(0.8f, 0.8f, 0.8f, 0.2f);
+            public static readonly Color dragged = new(1f, 1f, 0f, 0.3f);
             public static readonly Color dragBounds = new(0.85f, 1f, 0f);
             public static readonly Color selectedPoint = new(0.5f, 1f, 1f, 0.3f);
             public static readonly Color hoverGuides = new(0.7f, 0f, 0f);
             public static readonly Color selectionRectBorder = new(0, 0.9f, 0.9f);
+            public static readonly Color invalid = new(0.5f, 0.5f, 0.5f, 0.2f);
         }
 
         internal enum MouseState { Unclicked = 0, Clicked = 1, Dragging = 2 }
@@ -115,6 +120,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [SerializeField] bool _WaveformVisible;
         [SerializeField] bool _WaveformNormalize;
         [SerializeField] float _WaveformRenderScale;
+        [SerializeField] float _WaveformHeightMultiplier;
         [SerializeField] float _Time;
 
         Texture2D _waveformTexture;
@@ -147,8 +153,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             else
                 _WaveformVisible = _WaveformNormalize = false;
             _Time = Mathf.Clamp(_Time, Settings.TimeMin, Settings.TimeMax);
-            if (_WaveformRenderScale <= Settings.WaveformRenderScaleMin)
+            if (_WaveformRenderScale < Settings.WaveformRenderScaleMin || 
+                _WaveformRenderScale > Settings.WaveformRenderScaleMax)
                 _WaveformRenderScale = 1;
+            if (_WaveformHeightMultiplier < Settings.WaveformHeightMultiplierMin || 
+                _WaveformHeightMultiplier > Settings.WaveformHeightMultiplierMax)
+                _WaveformHeightMultiplier = 1;
             _amplitudeMousePosition = _frequencyMousePosition = null;
             _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
@@ -158,9 +168,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _Events ??= new List<HapticEvent>();
             _Events.Clear();
+
+            rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints).MarkDirtyRepaint();
+            rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints).MarkDirtyRepaint();
         }
 
         //TODO: Separate into multiple methods to reduce clutter
+        //TODO: Cache some frequently used controls
         public void CreateGUI()
         {
             Initialize();
@@ -192,6 +206,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var waveformRenderScaleField = rootVisualElement.Q<FloatField>(Controls.WaveformRenderScale);
             waveformRenderScaleField.SetValueWithoutNotify(_WaveformRenderScale);
             waveformRenderScaleField.RegisterValueChangedCallback(OnWaveformRenderScaleChanged);
+            var waveformHeightMultiplierField = rootVisualElement.Q<FloatField>(Controls.WaveformHeightMultiplier);
+            waveformHeightMultiplierField.SetValueWithoutNotify(_WaveformHeightMultiplier);
+            waveformHeightMultiplierField.RegisterValueChangedCallback(OnWaveformHeightMultiplierChanged);
             var amplitudePlotWaveform = rootVisualElement.Q<Image>(Controls.AmplitudePlotWaveform);
             var frequencyPlotWaveform = rootVisualElement.Q<Image>(Controls.FrequencyPlotWaveform);
             amplitudePlotWaveform.scaleMode = frequencyPlotWaveform.scaleMode = ScaleMode.StretchToFill;
@@ -228,7 +245,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             // Plot scroll
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
             plotScroll.RegisterCallback<GeometryChangedEvent>(PlotScroll_GeometryChanged);
-            plotScroll[0].RegisterCallback<WheelEvent>(OnWheelOverPlotScroll);
+            plotScroll.contentViewport.RegisterCallback<WheelEvent>(OnWheelOverPlotScroll);
             var amplitudePlotYAxisLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotYAxisLabels);
             amplitudePlotYAxisLabels.RegisterCallback<GeometryChangedEvent, string>(YAxisLabels_GeometryChanged, Controls.AmplitudePlot);
             var amplitudePlotXLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotXAxisLabels);
@@ -370,33 +387,44 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void OnWheelOverPlotScroll(WheelEvent wheelEvent)
         {
+            wheelEvent.PreventDefault();
+            wheelEvent.StopPropagation();
+            wheelEvent.StopImmediatePropagation();
+
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
-            Vector2 scrollOffset = plotScroll.scrollOffset;
-            float contentWidth = plotScroll.contentContainer.worldBound.width;
+            VisualElement contentContainer = plotScroll.contentContainer;
+            float contentWidth = contentContainer.worldBound.width;
             float viewportWidth = plotScroll.contentViewport.worldBound.width;
             if (wheelEvent.ctrlKey)
             {
-                float scrollMouseX = scrollOffset.x + wheelEvent.localMousePosition.x;
+                float scrollMouseX = _scrollOffset + wheelEvent.localMousePosition.x;
                 float posX = scrollMouseX / contentWidth;
                 float newZoom = _zoom - Mathf.Sign(wheelEvent.delta.y) * Settings.ZoomDelta;
                 newZoom = Mathf.Clamp(newZoom, 1, Settings.ZoomMax);
                 contentWidth = viewportWidth * newZoom;
                 _scrollOffset = posX * contentWidth - wheelEvent.localMousePosition.x;
+                if (_scrollOffset == 0)
+                    contentContainer.RegisterCallback<GeometryChangedEvent>(ReSetScrollOffset);
                 UpdateZoom(newZoom);
             }
             else if (_zoom > 1f)
-            {
                 _scrollOffset += contentWidth * Mathf.Sign(wheelEvent.delta.y) * Settings.ScrollDelta;
-            }
             else
-            {
                 return;
-            }
-            
+
             _scrollOffset = Mathf.Clamp(_scrollOffset, 0, contentWidth - viewportWidth);
+            Vector2 scrollOffset = plotScroll.scrollOffset;
             scrollOffset.x = _scrollOffset;
-            plotScroll.scrollOffset = scrollOffset; //TODO: doesn't set correctly
-            wheelEvent.PreventDefault();
+            plotScroll.scrollOffset = scrollOffset;
+        }
+
+        void ReSetScrollOffset(GeometryChangedEvent geometryChangedEvent)
+        {
+            var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
+            Vector2 scrollOffset = plotScroll.scrollOffset;
+            scrollOffset.x = _scrollOffset;
+            plotScroll.scrollOffset = scrollOffset;
+            plotScroll.contentContainer.UnregisterCallback<GeometryChangedEvent>(ReSetScrollOffset);
         }
 
         void OnZoomValueChanged(ChangeEvent<float> zoomChange) => UpdateZoom(zoomChange.newValue);
@@ -431,6 +459,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _Time = GetMinTime();
             var timeField = rootVisualElement.Q<FloatField>(Controls.TimeField);
             timeField.value = _Time;
+
+            rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints).MarkDirtyRepaint();
+            rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints).MarkDirtyRepaint();
         }
 
         void OnWaveformAssetChanged(ChangeEvent<Object> changeEvent)
@@ -470,6 +501,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             RepaintAudioWaveform();
         }
 
+        void OnWaveformHeightMultiplierChanged(ChangeEvent<float> changeEvent)
+        {
+            _WaveformHeightMultiplier = Mathf.Clamp(changeEvent.newValue,
+                Settings.WaveformHeightMultiplierMin, Settings.WaveformHeightMultiplierMax);
+            ((FloatField)changeEvent.target).SetValueWithoutNotify(_WaveformHeightMultiplier);
+            RepaintAudioWaveform();
+        }
+
         void AmplitudePlot_GenerateVisualContent(MeshGenerationContext context)
         {
             DrawGridLines(context, Controls.AmplitudePlotYAxisLabels, true);
@@ -499,15 +538,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     }
                     plotPoint = RealToPlotPoint(new Vector2(continuousEvent.IntensityCurve[^1].Time, 0), plotSize);
                     points.Add(plotPoint);
-                    painter.DrawLine(width: Settings.EventLineWidth, color: Colors.eventContinuous, 
-                        lineJoin: LineJoin.Bevel, points: points.ToArray());
+                    painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points.ToArray());
                 }
             }
 
             if (_amplitudeMousePosition != null)
             {
                 Vector2 amplitudeMousePosition = _amplitudeMousePosition.Value;
-                if (VisualElementContainsPoint(context.visualElement, amplitudeMousePosition))
+                if (context.visualElement.ContainsPointWithBorders(amplitudeMousePosition))
                 {
                     DrawHoverGuides(context, amplitudeMousePosition);
                     if (_mouseState == MouseState.Dragging)
@@ -520,7 +558,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
                         Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
                         Color c = AnyContinuousEventsExist(leftPoint.x, rightPoint.x) ? 
-                            Colors.hoverPoint : Colors.eventContinuousCreation;
+                            Colors.invalid : Colors.eventContinuousCreation;
                         painter.DrawPolygon(c, true, new Vector2(firstPoint.x, plotSize.y),
                             firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
                     }
@@ -561,15 +599,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     }
                     plotPoint = RealToPlotPoint(new Vector2(continuousEvent.SharpnessCurve[^1].Time, 0), plotSize);
                     points.Add(plotPoint);
-                    painter.DrawLine(width: Settings.EventLineWidth, color: Colors.eventContinuous,
-                        lineJoin: LineJoin.Bevel, points: points.ToArray());
+                    painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points.ToArray());
                 }
             }
 
             if (_frequencyMousePosition != null) 
             {
                 Vector2 frequencyMousePosition = _frequencyMousePosition.Value;
-                if (VisualElementContainsPoint(context.visualElement, frequencyMousePosition))
+                if (context.visualElement.ContainsPointWithBorders(frequencyMousePosition))
                 {
                     DrawHoverGuides(context, frequencyMousePosition);
                     if (_mouseState == MouseState.Dragging)
@@ -582,7 +619,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
                         Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
                         Color c = AnyContinuousEventsExist(leftPoint.x, rightPoint.x) ?
-                            Colors.hoverPoint : Colors.eventContinuousCreation;
+                            Colors.invalid : Colors.eventContinuousCreation;
                         painter.DrawPolygon(c, true, new Vector2(firstPoint.x, plotSize.y),
                             firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
                     }
@@ -669,7 +706,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         void AmplitudePlot_PointerUp(PointerUpEvent pointerUpEvent)
         {
             var amplitudePlot = (VisualElement)pointerUpEvent.target;
-            if (_amplitudeMousePosition != null && !VisualElementContainsPoint(amplitudePlot, _amplitudeMousePosition.Value))
+            if (_amplitudeMousePosition != null && !amplitudePlot.ContainsPointWithBorders(_amplitudeMousePosition.Value))
             {
                 HandlePlotPointerHover(amplitudePlot, null,
                     ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
@@ -751,7 +788,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         void FrequencyPlot_PointerUp(PointerUpEvent pointerUpEvent) 
         {
             var frequencyPlot = (VisualElement)pointerUpEvent.target;
-            if (_frequencyMousePosition != null && !VisualElementContainsPoint(frequencyPlot, _frequencyMousePosition.Value))
+            if (_frequencyMousePosition != null && !frequencyPlot.ContainsPointWithBorders(_frequencyMousePosition.Value))
             {
                 HandlePlotPointerHover(frequencyPlot, null,
                     ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
@@ -834,7 +871,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 float waveformSize = _WaveformClip.length / _Time;
                 float waveformScaledSize = waveformSize * _WaveformRenderScale;
                 _waveformTexture = AudioClipUtils.PaintAudioWaveform(_WaveformClip, (int)(plotRect.width * waveformScaledSize),
-                    (int)(plotRect.height * waveformScaledSize), Color.clear, Color.white, _WaveformNormalize);
+                    (int)(plotRect.height * waveformScaledSize), Color.clear, Color.white, _WaveformNormalize, _WaveformHeightMultiplier);
                 amplitudePlotWaveform.style.width = frequencyPlotWaveform.style.width = 
                     Length.Percent(waveformSize * 100);
             }
@@ -848,10 +885,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 _WaveformClip != null ? _WaveformClip.length : 0);
         }
 
-        //TODO: implement
         float GetLastPointTime()
         {
-            return 0;
+            float lastPointTime = 0, t;
+            foreach (var ev in _Events)
+            {
+                t = ev is TransientEvent ? ev.Time : ((ContinuousEvent)ev).IntensityCurve[^1].Time;
+                lastPointTime = Mathf.Max(t, lastPointTime);
+            }
+            return lastPointTime;
         }
 
         Vector2 SnapPointerPosition(Vector2 pointerPosition, Vector2 plotSize)
@@ -913,12 +955,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     return true;
             }
             return false;
-        }
-
-        static bool VisualElementContainsPoint(VisualElement visualElement, Vector2 point)
-        {
-            Vector2 size = visualElement.worldBound.size;
-            return point.x >= 0 && point.x <= size.x && point.y >=0 && point.y <= size.y;
         }
     }
 }

@@ -1,14 +1,16 @@
 {
 	"name": "com.chroma.ahapeditor",
-	"version": "0.5.1",
-	"displayName": "AHAP Editor",
+	"version": "0.6.0",
+	"displayName": "Haptics Editor",
 	"description": "This package contains an editor window script allowing to edit advanced haptic patterns.",
-	"unity": "2021.3",
+	"unity": "2022.2",
 	"dependencies": {
 		"com.unity.nuget.newtonsoft-json": "3.0.2"
 	},
 	"keywords": [
 		"haptics",
+		"vibrations",
+		"rumble",
 		"ahap",
 		"editor"
 	],

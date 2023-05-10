@@ -93,6 +93,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const float HoverGuideLineWidth = 1f;
             public const float HoverGuideCircleRadius = 4f;
             public const int MinBottomPanelWidth = 200;
+            public const float HoverOffset = 5f;
+            public const float HoverHighlightSize = 9f;
         }
 
         //TODO: move to stylesheet?
@@ -130,6 +132,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Vector2? _amplitudeMousePosition, _frequencyMousePosition;
         MouseState _mouseState;
         Vector2? _dragStartPosition;
+        EventPoint _hoverPoint;
 
         [MenuItem("Window/Haptics Editor")]
         public static void OpenWindow()
@@ -162,6 +165,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _amplitudeMousePosition = _frequencyMousePosition = null;
             _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
+            _hoverPoint = null;
         }
 
         void Clear()
@@ -173,7 +177,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints).MarkDirtyRepaint();
         }
 
-        //TODO: Separate into multiple methods to reduce clutter
+        //TODO: Separate into multiple methods
         //TODO: Cache some frequently used controls
         public void CreateGUI()
         {
@@ -404,7 +408,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 contentWidth = viewportWidth * newZoom;
                 _scrollOffset = posX * contentWidth - wheelEvent.localMousePosition.x;
                 if (_scrollOffset == 0)
-                    contentContainer.RegisterCallback<GeometryChangedEvent>(ReSetScrollOffset);
+                    contentContainer.RegisterCallback<GeometryChangedEvent>(SetScrollOffset);
                 UpdateZoom(newZoom);
             }
             else if (_zoom > 1f)
@@ -418,13 +422,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             plotScroll.scrollOffset = scrollOffset;
         }
 
-        void ReSetScrollOffset(GeometryChangedEvent geometryChangedEvent)
+        void SetScrollOffset(GeometryChangedEvent geometryChangedEvent)
         {
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
             Vector2 scrollOffset = plotScroll.scrollOffset;
             scrollOffset.x = _scrollOffset;
             plotScroll.scrollOffset = scrollOffset;
-            plotScroll.contentContainer.UnregisterCallback<GeometryChangedEvent>(ReSetScrollOffset);
+            plotScroll.contentContainer.UnregisterCallback<GeometryChangedEvent>(SetScrollOffset);
         }
 
         void OnZoomValueChanged(ChangeEvent<float> zoomChange) => UpdateZoom(zoomChange.newValue);
@@ -516,6 +520,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             var painter = context.painter2D;
             Vector2 plotSize = context.visualElement.worldBound.size;
+
+            if (_amplitudeMousePosition != null && _hoverPoint != null)
+            {
+                Vector2 plotPoint = RealToPlotPoint(_hoverPoint, plotSize);
+                painter.DrawFilledCircle(plotPoint, Settings.HoverHighlightSize, Colors.hovered);
+            }
+
             foreach (var hapticEvent in _Events)
             {
                 if (hapticEvent is TransientEvent transientEvent)
@@ -577,6 +588,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             var painter = context.painter2D;
             Vector2 plotSize = context.visualElement.worldBound.size;
+
+            if (_frequencyMousePosition != null && _hoverPoint != null)
+            {
+                Vector2 plotPoint = RealToPlotPoint(_hoverPoint, plotSize);
+                painter.DrawFilledCircle(plotPoint, Settings.HoverHighlightSize, Colors.hovered);
+            }
+
             foreach (var hapticEvent in _Events)
             {
                 if (hapticEvent is TransientEvent transientEvent)
@@ -842,6 +860,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var hoverValue = rootVisualElement.Q<Label>(Controls.HoverValue);
             if (pointerPosition != null)
             {
+                _hoverPoint = GetPointOnPosition(PlotToRealPoint(pointerPosition.Value, plot.worldBound.size),
+                    plotName == "Amplitude" ? MouseLocation.IntensityPlot : MouseLocation.SharpnessPlot);
                 positionCache = SnapPointerPosition(pointerPosition.Value, plot.worldBound.size);
                 hoverPlotName.text = plotName;
                 Vector2 clampedPointerPosition = PlotToRealPoint(positionCache.Value, plot.worldBound.size);
@@ -854,6 +874,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 positionCache = null;
                 hoverPlotName.text = hoverTime.text = hoverValue.text = "-";
+                _hoverPoint = null;
             }
         }
 
@@ -955,6 +976,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     return true;
             }
             return false;
+        }
+
+        EventPoint GetPointOnPosition(Vector2 plotPosition, MouseLocation plot)
+        {
+            if (plot == MouseLocation.Outside) 
+                return null;
+
+            var plotElement = rootVisualElement.Q<VisualElement>(plot == MouseLocation.IntensityPlot ? 
+                Controls.AmplitudePlot : Controls.FrequencyPlot);
+            Vector2 plotSize = plotElement.worldBound.size;
+            Vector2 pointOffset = new(Settings.HoverOffset * _Time / plotSize.x, Settings.HoverOffset / plotSize.y);
+            Rect offsetRect = new(plotPosition - pointOffset, pointOffset * 2);
+            foreach (var ev in _Events)
+            {
+                if (ev.IsOnPointInEvent(in offsetRect, plot, out EventPoint eventPoint))
+                    return eventPoint;
+            }
+            return null;
         }
     }
 }

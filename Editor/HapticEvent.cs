@@ -164,7 +164,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public override bool IsOnPointInEvent(in Rect offsetRect, MouseLocation location, out EventPoint eventPoint)
         {
             eventPoint = null;
-            if (location != MouseLocation.Outside || offsetRect.xMax < Time || offsetRect.xMin > IntensityCurve.Last().Time)
+            if (location != MouseLocation.Outside || offsetRect.xMax < Time || offsetRect.xMin > IntensityCurve[^1].Time)
             {
                 List<EventPoint> curve = location == MouseLocation.IntensityPlot ? IntensityCurve : SharpnessCurve;
                 foreach (EventPoint ep in curve)

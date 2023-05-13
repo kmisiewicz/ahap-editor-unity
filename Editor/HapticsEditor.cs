@@ -210,7 +210,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var waveformRenderScaleField = rootVisualElement.Q<FloatField>(Controls.WaveformRenderScale);
             waveformRenderScaleField.SetValueWithoutNotify(_WaveformRenderScale);
             waveformRenderScaleField.RegisterValueChangedCallback(OnWaveformRenderScaleChanged);
-            var waveformHeightMultiplierField = rootVisualElement.Q<FloatField>(Controls.WaveformHeightMultiplier);
+            var waveformHeightMultiplierField = rootVisualElement.Q<Slider>(Controls.WaveformHeightMultiplier);
             waveformHeightMultiplierField.SetValueWithoutNotify(_WaveformHeightMultiplier);
             waveformHeightMultiplierField.RegisterValueChangedCallback(OnWaveformHeightMultiplierChanged);
             var amplitudePlotWaveform = rootVisualElement.Q<Image>(Controls.AmplitudePlotWaveform);
@@ -509,7 +509,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _WaveformHeightMultiplier = Mathf.Clamp(changeEvent.newValue,
                 Settings.WaveformHeightMultiplierMin, Settings.WaveformHeightMultiplierMax);
-            ((FloatField)changeEvent.target).SetValueWithoutNotify(_WaveformHeightMultiplier);
+            ((Slider)changeEvent.target).SetValueWithoutNotify(_WaveformHeightMultiplier);
             RepaintAudioWaveform();
         }
 
@@ -816,7 +816,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (amplitudePlot.ContainsPoint(amplitudePlotLocalPointerPosition))
                 {
                     HandlePlotPointerHover(amplitudePlot, amplitudePlotLocalPointerPosition,
-                        ref _amplitudeMousePosition, "Frequency", Controls.FrequencyPlotPoints);
+                        ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
                 }
             }
             else if (pointerUpEvent.button == (int)MouseButton.LeftMouse)

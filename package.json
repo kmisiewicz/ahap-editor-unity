@@ -3,7 +3,7 @@
 	"version": "0.6.0",
 	"displayName": "Haptics Editor",
 	"description": "This package contains an editor window script allowing to edit advanced haptic patterns.",
-	"unity": "2022.2",
+	"unity": "2022.1",
 	"dependencies": {
 		"com.unity.nuget.newtonsoft-json": "3.0.2"
 	},

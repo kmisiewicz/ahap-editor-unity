@@ -893,8 +893,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 float waveformScaledSize = waveformSize * _WaveformRenderScale;
                 _waveformTexture = AudioClipUtils.PaintAudioWaveform(_WaveformClip, (int)(plotRect.width * waveformScaledSize),
                     (int)(plotRect.height * waveformScaledSize), Color.clear, Color.white, _WaveformNormalize, _WaveformHeightMultiplier);
-                amplitudePlotWaveform.style.width = frequencyPlotWaveform.style.width = 
-                    Length.Percent(waveformSize * 100);
+                amplitudePlotWaveform.style.width = frequencyPlotWaveform.style.width = Length.Percent(waveformSize * 100);
             }
 
             amplitudePlotWaveform.image = frequencyPlotWaveform.image = _waveformTexture;
@@ -920,8 +919,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Vector2 SnapPointerPosition(Vector2 pointerPosition, Vector2 plotSize)
         {
             var snapModeField = rootVisualElement.Q<EnumField>(Controls.SnapModeEnumField);
-            var snapMode = (AHAPEditorWindow.SnapMode)snapModeField.value;
-            if (snapMode != AHAPEditorWindow.SnapMode.None)
+            var snapMode = (SnapMode)snapModeField.value;
+            if (snapMode != SnapMode.None)
             {
                 pointerPosition = PlotToRealPoint(pointerPosition, plotSize);
                 pointerPosition.x = (float)Math.Round(pointerPosition.x, (int)snapMode);
@@ -996,4 +995,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return null;
         }
     }
+
+    internal enum SnapMode
+    {
+        None = 0,
+        [InspectorName("0.1")] Tenth = 1,
+        [InspectorName("0.01")] Hundredth = 2,
+        [InspectorName("0.001")] Thousandth = 3
+    }
+
+    internal enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
 }

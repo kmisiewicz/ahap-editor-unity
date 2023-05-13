@@ -1,12 +1,11 @@
 {
-    "name": "com.chroma.ahapeditor.Editor",
+    "name": "com.chroma.hapticseditor.Editor",
     "rootNamespace": "",
     "references": [
-        "GUID:dba75ab218643764685a2107a81b7f87"
+        "GUID:dba75ab218643764685a2107a81b7f87",
+        "GUID:1106d60fdb659644c9eab47d714778d5"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

@@ -119,6 +119,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public List<EventPoint> SharpnessCurve;
 
         public override float Time => IntensityCurve?.FirstOrDefault()?.Time ?? 0;
+        public float TimeMax => IntensityCurve?.LastOrDefault()?.Time ?? 0;
 
         public ContinuousEvent() { }
 

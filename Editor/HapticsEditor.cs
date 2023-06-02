@@ -129,10 +129,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         float _zoom, _lastPaintedZoom;
         float _scrollOffset;
         int _firstRepaintCounter;
-        Vector2? _amplitudeMousePosition, _frequencyMousePosition;
         MouseState _mouseState;
         Vector2? _dragStartPosition;
         EventPoint _hoverPoint;
+
+        PlotInfo _amplitudePlotInfo;
+        PlotInfo _frequencyPlotInfo;
 
         [MenuItem("Window/Haptics Editor")]
         public static void OpenWindow()
@@ -162,7 +164,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             if (_WaveformHeightMultiplier < Settings.WaveformHeightMultiplierMin || 
                 _WaveformHeightMultiplier > Settings.WaveformHeightMultiplierMax)
                 _WaveformHeightMultiplier = 1;
-            _amplitudeMousePosition = _frequencyMousePosition = null;
+            if (_amplitudePlotInfo != null)
+                _amplitudePlotInfo.MousePosition = null;
+            if (_frequencyPlotInfo != null)
+                _frequencyPlotInfo.MousePosition = null;
             _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
             _hoverPoint = null;
@@ -172,7 +177,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _Events ??= new List<HapticEvent>();
             _Events.Clear();
+            RepaintPoints();
+        }
 
+        private void RepaintPoints()
+        {
             rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints).MarkDirtyRepaint();
             rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints).MarkDirtyRepaint();
         }
@@ -248,29 +257,51 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             // Plot scroll
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
+            var amplitudePlotYLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotYAxisLabels);
+            var amplitudePlotXLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotXAxisLabels);
+            var frequencyPlotYLabels = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotYAxisLabels);
+            var frequencyPlotXLabels = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotXAxisLabels);
+            var amplitudePlotPoints = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints);
+            var frequencyPlotPoints = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints);
+
+            _amplitudePlotInfo = new PlotInfo()
+            {
+                Plot = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlot),
+                PlotPoints = amplitudePlotPoints,
+                PlotWaveform = amplitudePlotWaveform,
+                XAxisLabelsParent = amplitudePlotXLabels,
+                YAxisLabelsParent = amplitudePlotYLabels,
+                Name = "Amplitude",
+                MouseLocation = MouseLocation.IntensityPlot
+            };
+            _frequencyPlotInfo = new PlotInfo()
+            {
+                Plot = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlot),
+                PlotPoints = frequencyPlotPoints,
+                PlotWaveform = frequencyPlotWaveform,
+                XAxisLabelsParent = frequencyPlotXLabels,
+                YAxisLabelsParent = frequencyPlotYLabels,
+                Name = "Frequency",
+                MouseLocation = MouseLocation.SharpnessPlot
+            };
+
             plotScroll.RegisterCallback<GeometryChangedEvent>(PlotScroll_GeometryChanged);
             plotScroll.contentViewport.RegisterCallback<WheelEvent>(OnWheelOverPlotScroll);
-            var amplitudePlotYAxisLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotYAxisLabels);
-            amplitudePlotYAxisLabels.RegisterCallback<GeometryChangedEvent, string>(YAxisLabels_GeometryChanged, Controls.AmplitudePlot);
-            var amplitudePlotXLabels = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotXAxisLabels);
+            amplitudePlotYLabels.RegisterCallback<GeometryChangedEvent, VisualElement>(YAxisLabels_GeometryChanged, _amplitudePlotInfo.Plot);
             amplitudePlotXLabels.RegisterCallback<GeometryChangedEvent>(XAxisLabels_GeometryChanged);
-            var frequencyPlotYAxisLabels = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotYAxisLabels);
-            frequencyPlotYAxisLabels.RegisterCallback<GeometryChangedEvent, string>(YAxisLabels_GeometryChanged, Controls.FrequencyPlot);
-            var frequencyPlotXLabels = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotXAxisLabels);
+            frequencyPlotYLabels.RegisterCallback<GeometryChangedEvent, VisualElement>(YAxisLabels_GeometryChanged, _frequencyPlotInfo.Plot);
             frequencyPlotXLabels.RegisterCallback<GeometryChangedEvent>(XAxisLabels_GeometryChanged);
-            var amplitudePlotPoints = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints);
-            amplitudePlotPoints.RegisterCallback<PointerEnterEvent>(AmplitudePlot_PointerEntered);
-            amplitudePlotPoints.RegisterCallback<PointerMoveEvent>(AmplitudePlot_PointerMoved);
-            amplitudePlotPoints.RegisterCallback<PointerOutEvent>(AmplitudePlot_PointerOut);
-            amplitudePlotPoints.RegisterCallback<PointerUpEvent>(AmplitudePlot_PointerUp);
-            amplitudePlotPoints.RegisterCallback<PointerDownEvent>(AmplitudePlot_PointerDown);
+            amplitudePlotPoints.RegisterCallback<PointerEnterEvent, (PlotInfo, PlotInfo)>(Plot_PointerEntered, (_amplitudePlotInfo, _frequencyPlotInfo));
+            amplitudePlotPoints.RegisterCallback<PointerMoveEvent, (PlotInfo, PlotInfo)>(Plot_PointerMoved, (_amplitudePlotInfo, _frequencyPlotInfo));
+            amplitudePlotPoints.RegisterCallback<PointerOutEvent, (PlotInfo, PlotInfo)>(Plot_PointerOut, (_amplitudePlotInfo, _frequencyPlotInfo));
+            amplitudePlotPoints.RegisterCallback<PointerDownEvent>(Plot_PointerDown);
+            amplitudePlotPoints.RegisterCallback<PointerUpEvent, (PlotInfo, PlotInfo)>(Plot_PointerUp, (_amplitudePlotInfo, _frequencyPlotInfo));
             amplitudePlotPoints.generateVisualContent += AmplitudePlot_GenerateVisualContent;
-            var frequencyPlotPoints = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints);
-            frequencyPlotPoints.RegisterCallback<PointerEnterEvent>(FrequencyPlot_PointerEntered);
-            frequencyPlotPoints.RegisterCallback<PointerMoveEvent>(FrequencyPlot_PointerMoved);
-            frequencyPlotPoints.RegisterCallback<PointerOutEvent>(FrequencyPlot_PointerOut);
-            frequencyPlotPoints.RegisterCallback<PointerUpEvent>(FrequencyPlot_PointerUp);
-            frequencyPlotPoints.RegisterCallback<PointerDownEvent>(FrequencyPlot_PointerDown);
+            frequencyPlotPoints.RegisterCallback<PointerEnterEvent, (PlotInfo, PlotInfo)>(Plot_PointerEntered, (_frequencyPlotInfo, _amplitudePlotInfo));
+            frequencyPlotPoints.RegisterCallback<PointerMoveEvent, (PlotInfo, PlotInfo)>(Plot_PointerMoved, (_frequencyPlotInfo, _amplitudePlotInfo));
+            frequencyPlotPoints.RegisterCallback<PointerOutEvent, (PlotInfo, PlotInfo)>(Plot_PointerOut, (_frequencyPlotInfo, _amplitudePlotInfo));
+            frequencyPlotPoints.RegisterCallback<PointerDownEvent>(Plot_PointerDown);
+            frequencyPlotPoints.RegisterCallback<PointerUpEvent, (PlotInfo, PlotInfo)>(Plot_PointerUp, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.generateVisualContent += FrequencyPlot_GenerateVisualContent;
         }
 
@@ -285,7 +316,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             RepaintAudioWaveform();
         }
 
-        void YAxisLabels_GeometryChanged(GeometryChangedEvent geometryChangedEvent, string plot)
+        void YAxisLabels_GeometryChanged(GeometryChangedEvent geometryChangedEvent, VisualElement plot)
         {
             DrawYAxisLabels((VisualElement)geometryChangedEvent.target, plot);
         }
@@ -295,10 +326,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             DrawXAxisLabels((VisualElement)geometryChangedEvent.target);
         }
 
-        void DrawYAxisLabels(VisualElement labelsParent, string plotElementName)
+        void DrawYAxisLabels(VisualElement labelsParent, VisualElement plot)
         {
             labelsParent.Clear();
-            var plot = rootVisualElement.Q<VisualElement>(plotElementName);
             float plotHeight = plot.worldBound.height;
             float singleLineHeight = EditorGUIUtility.singleLineHeight;
             if (plotHeight < singleLineHeight)
@@ -463,9 +493,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _Time = GetMinTime();
             var timeField = rootVisualElement.Q<FloatField>(Controls.TimeField);
             timeField.value = _Time;
-
-            rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints).MarkDirtyRepaint();
-            rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints).MarkDirtyRepaint();
+            RepaintPoints();
         }
 
         void OnWaveformAssetChanged(ChangeEvent<Object> changeEvent)
@@ -513,15 +541,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             RepaintAudioWaveform();
         }
 
-        void AmplitudePlot_GenerateVisualContent(MeshGenerationContext context)
+        void Plot_GenerateVisualContent(MeshGenerationContext context, PlotInfo plotInfo, PlotInfo otherPlotInfo)
         {
-            DrawGridLines(context, Controls.AmplitudePlotYAxisLabels, true);
-            DrawGridLines(context, Controls.AmplitudePlotXAxisLabels, false);
+            DrawGridLines(context, plotInfo.YAxisLabelsParent.name, true);
+            DrawGridLines(context, plotInfo.XAxisLabelsParent.name, false);
 
             var painter = context.painter2D;
             Vector2 plotSize = context.visualElement.worldBound.size;
 
-            if (_amplitudeMousePosition != null && _hoverPoint != null)
+            if (plotInfo.MousePosition != null && _hoverPoint != null)
             {
                 Vector2 plotPoint = RealToPlotPoint(_hoverPoint, plotSize);
                 painter.DrawFilledCircle(plotPoint, Settings.HoverHighlightSize, Colors.hovered);
@@ -531,7 +559,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 if (hapticEvent is TransientEvent transientEvent)
                 {
-                    Vector2 plotPoint = RealToPlotPoint(transientEvent.Intensity, plotSize);
+                    EventPoint point = plotInfo.MouseLocation == MouseLocation.IntensityPlot ? 
+                        transientEvent.Intensity : transientEvent.Sharpness;
+                    Vector2 plotPoint = RealToPlotPoint(point, plotSize);
                     painter.DrawFilledCircle(plotPoint, Settings.EventPointRadius, Colors.eventTransient);
                     painter.DrawLine(Settings.EventLineWidth, Colors.eventTransient, false, null, plotPoint,
                         new Vector2(plotPoint.x, plotSize.y));
@@ -539,114 +569,55 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 else if (hapticEvent is ContinuousEvent continuousEvent)
                 {
                     List<Vector2> points = new();
-                    Vector2 plotPoint = RealToPlotPoint(new Vector2(continuousEvent.IntensityCurve[0].Time, 0), plotSize);
+                    List<EventPoint> curve = plotInfo.MouseLocation == MouseLocation.IntensityPlot ?
+                        continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
+                    Vector2 plotPoint = RealToPlotPoint(new Vector2(continuousEvent.Time, 0), plotSize);
                     points.Add(plotPoint);
-                    foreach (var realPoint in continuousEvent.IntensityCurve)
+                    foreach (var realPoint in curve)
                     {
                         plotPoint = RealToPlotPoint(realPoint, plotSize);
                         points.Add(plotPoint);
                         painter.DrawFilledCircle(plotPoint, Settings.EventPointRadius, Colors.eventContinuous);
                     }
-                    plotPoint = RealToPlotPoint(new Vector2(continuousEvent.IntensityCurve[^1].Time, 0), plotSize);
+                    plotPoint = RealToPlotPoint(new Vector2(continuousEvent.TimeMax, 0), plotSize);
                     points.Add(plotPoint);
                     painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points.ToArray());
                 }
             }
 
-            if (_amplitudeMousePosition != null)
+            if (plotInfo.MousePosition != null)
             {
-                Vector2 amplitudeMousePosition = _amplitudeMousePosition.Value;
-                if (context.visualElement.ContainsPointWithBorders(amplitudeMousePosition))
+                Vector2 mousePosition = plotInfo.MousePosition.Value;
+                if (context.visualElement.ContainsPointWithBorders(mousePosition))
                 {
-                    DrawHoverGuides(context, amplitudeMousePosition);
+                    DrawHoverGuides(context, mousePosition);
                     if (_mouseState == MouseState.Dragging)
                     {
                         Vector2 firstPoint = _dragStartPosition.Value;
-                        Vector2 secondPoint = amplitudeMousePosition;
-                        if (secondPoint.x < firstPoint.x)
-                            (firstPoint, secondPoint) = (secondPoint, firstPoint);
-
+                        Vector2 secondPoint = mousePosition;
                         Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
                         Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
-                        Color c = AnyContinuousEventsExist(leftPoint.x, rightPoint.x) ? 
+                        Color gizmoColor = AnyContinuousEventsInRange(leftPoint.x, rightPoint.x) ?
                             Colors.invalid : Colors.eventContinuousCreation;
-                        painter.DrawPolygon(c, true, new Vector2(firstPoint.x, plotSize.y),
+                        painter.DrawPolygon(gizmoColor, true, new Vector2(firstPoint.x, plotSize.y),
                             firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
                     }
                 }
-                else if (amplitudeMousePosition.x > 0)
-                    DrawVerticalHoverGuide(context, amplitudeMousePosition);
+                else if (mousePosition.x > 0)
+                    DrawVerticalHoverGuide(context, mousePosition);
             }
-            else if (_frequencyMousePosition != null)
-                DrawVerticalHoverGuide(context, _frequencyMousePosition.Value);
+            else if (otherPlotInfo.MousePosition != null)
+                DrawVerticalHoverGuide(context, otherPlotInfo.MousePosition.Value);
+        }
+
+        void AmplitudePlot_GenerateVisualContent(MeshGenerationContext context)
+        {
+            Plot_GenerateVisualContent(context, _amplitudePlotInfo, _frequencyPlotInfo);
         }
         
         void FrequencyPlot_GenerateVisualContent(MeshGenerationContext context)
         {
-            DrawGridLines(context, Controls.FrequencyPlotYAxisLabels, true);
-            DrawGridLines(context, Controls.FrequencyPlotXAxisLabels, false);
-
-            var painter = context.painter2D;
-            Vector2 plotSize = context.visualElement.worldBound.size;
-
-            if (_frequencyMousePosition != null && _hoverPoint != null)
-            {
-                Vector2 plotPoint = RealToPlotPoint(_hoverPoint, plotSize);
-                painter.DrawFilledCircle(plotPoint, Settings.HoverHighlightSize, Colors.hovered);
-            }
-
-            foreach (var hapticEvent in _Events)
-            {
-                if (hapticEvent is TransientEvent transientEvent)
-                {
-                    Vector2 plotPoint = RealToPlotPoint(transientEvent.Sharpness, plotSize);
-                    painter.DrawFilledCircle(plotPoint, Settings.EventPointRadius, Colors.eventTransient);
-                    painter.DrawLine(Settings.EventLineWidth, Colors.eventTransient, false, null, plotPoint,
-                        new Vector2(plotPoint.x, plotSize.y));
-                }
-                else if (hapticEvent is ContinuousEvent continuousEvent)
-                {
-                    List<Vector2> points = new();
-                    Vector2 plotPoint = RealToPlotPoint(new Vector2(continuousEvent.SharpnessCurve[0].Time, 0), plotSize);
-                    points.Add(plotPoint);
-                    foreach (var realPoint in continuousEvent.SharpnessCurve)
-                    {
-                        plotPoint = RealToPlotPoint(realPoint, plotSize);
-                        points.Add(plotPoint);
-                        painter.DrawFilledCircle(plotPoint, Settings.EventPointRadius, Colors.eventContinuous);
-                    }
-                    plotPoint = RealToPlotPoint(new Vector2(continuousEvent.SharpnessCurve[^1].Time, 0), plotSize);
-                    points.Add(plotPoint);
-                    painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points.ToArray());
-                }
-            }
-
-            if (_frequencyMousePosition != null) 
-            {
-                Vector2 frequencyMousePosition = _frequencyMousePosition.Value;
-                if (context.visualElement.ContainsPointWithBorders(frequencyMousePosition))
-                {
-                    DrawHoverGuides(context, frequencyMousePosition);
-                    if (_mouseState == MouseState.Dragging)
-                    {
-                        Vector2 firstPoint = _dragStartPosition.Value;
-                        Vector2 secondPoint = frequencyMousePosition;
-                        if (secondPoint.x < firstPoint.x)
-                            (firstPoint, secondPoint) = (secondPoint, firstPoint);
-
-                        Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
-                        Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
-                        Color c = AnyContinuousEventsExist(leftPoint.x, rightPoint.x) ?
-                            Colors.invalid : Colors.eventContinuousCreation;
-                        painter.DrawPolygon(c, true, new Vector2(firstPoint.x, plotSize.y),
-                            firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
-                    }
-                }
-                else if (frequencyMousePosition.x >= 0)
-                    DrawVerticalHoverGuide(context, frequencyMousePosition);
-            }
-            else if (_amplitudeMousePosition != null)
-                DrawVerticalHoverGuide(context, _amplitudeMousePosition.Value);
+            Plot_GenerateVisualContent(context, _frequencyPlotInfo, _amplitudePlotInfo);
         }
 
         void DrawGridLines(MeshGenerationContext context, string labelsParentName, bool horizontal)
@@ -686,185 +657,91 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 new(mousePosition.x, 0), new(mousePosition.x, context.visualElement.worldBound.height));
         }
 
-        void AmplitudePlot_PointerEntered(PointerEnterEvent pointerEnterEvent)
+        void Plot_PointerEntered(PointerEnterEvent pointerEnterEvent, (PlotInfo, PlotInfo) plotInfos)
         {
-            if (_frequencyMousePosition == null)
-                HandlePlotPointerHover(pointerEnterEvent.target, pointerEnterEvent.localPosition,
-                    ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
+            if (plotInfos.Item2.MousePosition == null)
+                HandlePlotPointerHover(plotInfos.Item1, pointerEnterEvent.localPosition);
         }
 
-        void AmplitudePlot_PointerMoved(PointerMoveEvent pointerMoveEvent)
+        void Plot_PointerMoved(PointerMoveEvent pointerMoveEvent, (PlotInfo, PlotInfo) plotInfos)
         {
             if (_mouseState == MouseState.Clicked)
             {
-                Vector2 point = PlotToRealPoint(_dragStartPosition.Value, ((VisualElement)pointerMoveEvent.target).worldBound.size);
+                Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotInfos.Item1.Plot.worldBound.size);
                 _mouseState = TryGetContinuousEvent(point.x, out _) ? MouseState.Unclicked : MouseState.Dragging;
             }
 
-            if (_frequencyMousePosition == null)
-                HandlePlotPointerHover(pointerMoveEvent.target, pointerMoveEvent.localPosition,
-                    ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
+            if (plotInfos.Item2.MousePosition == null)
+                HandlePlotPointerHover(plotInfos.Item1, pointerMoveEvent.localPosition);
         }
 
-        void AmplitudePlot_PointerOut(PointerOutEvent pointerOutEvent)
+        void Plot_PointerOut(PointerOutEvent pointerOutEvent, (PlotInfo, PlotInfo) plotInfos)
         {
-            if (_frequencyMousePosition == null)
-                HandlePlotPointerHover(pointerOutEvent.target, null,
-                    ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
+            if (plotInfos.Item2.MousePosition == null)
+                HandlePlotPointerHover(plotInfos.Item1, null);
         }
 
-        void AmplitudePlot_PointerDown(PointerDownEvent pointerDownEvent)
+        void Plot_PointerDown(PointerDownEvent pointerDownEvent)
         {
-            var amplitudePlot = (VisualElement)pointerDownEvent.target;
-            amplitudePlot.CapturePointer(0);
+            var plot = (VisualElement)pointerDownEvent.target;
+            plot.CapturePointer(0);
             _mouseState = MouseState.Clicked;
-            _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, amplitudePlot.worldBound.size);
+            _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, plot.worldBound.size);
         }
 
-        void AmplitudePlot_PointerUp(PointerUpEvent pointerUpEvent)
+        void Plot_PointerUp(PointerUpEvent pointerUpEvent, (PlotInfo, PlotInfo) plotInfos)
         {
-            var amplitudePlot = (VisualElement)pointerUpEvent.target;
-            if (_amplitudeMousePosition != null && !amplitudePlot.ContainsPointWithBorders(_amplitudeMousePosition.Value))
+            var thisPlot = (VisualElement)pointerUpEvent.target;
+            if (plotInfos.Item1.MousePosition != null && !thisPlot.ContainsPointWithBorders(plotInfos.Item1.MousePosition.Value))
             {
-                HandlePlotPointerHover(amplitudePlot, null,
-                    ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
+                HandlePlotPointerHover(plotInfos.Item1, null);
 
-                var frequencyPlot = rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotPoints);
-                Vector2 frequencyPlotLocalPointerPosition = frequencyPlot.WorldToLocal(pointerUpEvent.position);
-                if (frequencyPlot.ContainsPoint(frequencyPlotLocalPointerPosition))
-                {
-                    HandlePlotPointerHover(frequencyPlot, frequencyPlotLocalPointerPosition,
-                        ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-                }
+                var otherPlot = plotInfos.Item2.Plot;
+                Vector2 otherPlotLocalPointerPosition = otherPlot.WorldToLocal(pointerUpEvent.position);
+                if (otherPlot.ContainsPoint(otherPlotLocalPointerPosition))
+                    HandlePlotPointerHover(plotInfos.Item2, otherPlotLocalPointerPosition);
             }
             else if (pointerUpEvent.button == (int)MouseButton.LeftMouse)
             {
-                Vector2 plotSize = amplitudePlot.worldBound.size;
+                Vector2 plotSize = thisPlot.worldBound.size;
                 if (_mouseState == MouseState.Clicked)
                 {
                     Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotSize);
                     if (TryGetContinuousEvent(point.x, out ContinuousEvent ce))
-                        ce.AddPointToCurve(point, MouseLocation.IntensityPlot);
+                        ce.AddPointToCurve(point, plotInfos.Item1.MouseLocation);
                     else
-                        _Events.Add(new TransientEvent(point, MouseLocation.IntensityPlot));
+                        _Events.Add(new TransientEvent(point, plotInfos.Item1.MouseLocation));
                 }
                 else if (_mouseState == MouseState.Dragging)
                 {
                     Vector2 firstPoint = PlotToRealPoint(_dragStartPosition.Value, plotSize);
                     Vector2 secondPoint = SnapPointerPosition(pointerUpEvent.localPosition, plotSize);
                     secondPoint = PlotToRealPoint(secondPoint, plotSize);
-                    if (secondPoint.x < firstPoint.x)
-                        (firstPoint, secondPoint) = (secondPoint, firstPoint);
-
-                    if (!AnyContinuousEventsExist(firstPoint.x, secondPoint.x))
-                        _Events.Add(new ContinuousEvent(firstPoint, secondPoint, MouseLocation.IntensityPlot));
+                    if (!AnyContinuousEventsInRange(firstPoint.x, secondPoint.x))
+                        _Events.Add(new ContinuousEvent(firstPoint, secondPoint, plotInfos.Item1.MouseLocation));
                 }
-                HandlePlotPointerHover(amplitudePlot, pointerUpEvent.localPosition,
-                    ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
+                HandlePlotPointerHover(plotInfos.Item1, pointerUpEvent.localPosition);
             }
 
-            amplitudePlot.ReleasePointer(0);
+            thisPlot.ReleasePointer(0);
             _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
         }
 
-        void FrequencyPlot_PointerEntered(PointerEnterEvent pointerEnterEvent)
+        void HandlePlotPointerHover(PlotInfo hoverPlotInfo, Vector2? pointerPosition)
         {
-            if (_amplitudeMousePosition == null)
-                HandlePlotPointerHover(pointerEnterEvent.target, pointerEnterEvent.localPosition,
-                    ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-        }
-        
-        void FrequencyPlot_PointerMoved(PointerMoveEvent pointerMoveEvent)
-        {
-            if (_mouseState == MouseState.Clicked)
-            {
-                Vector2 point = PlotToRealPoint(_dragStartPosition.Value, ((VisualElement)pointerMoveEvent.target).worldBound.size);
-                _mouseState = TryGetContinuousEvent(point.x, out _) ? MouseState.Unclicked : MouseState.Dragging;
-            }
-
-            if (_amplitudeMousePosition == null)
-                HandlePlotPointerHover(pointerMoveEvent.target, pointerMoveEvent.localPosition,
-                    ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-        }
-
-        void FrequencyPlot_PointerOut(PointerOutEvent pointerOutEvent)
-        {
-            if (_amplitudeMousePosition == null)
-                HandlePlotPointerHover(pointerOutEvent.target, null,
-                    ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-        }
-
-        void FrequencyPlot_PointerDown(PointerDownEvent pointerDownEvent)
-        {
-            var frequencyPlot = (VisualElement)pointerDownEvent.target;
-            frequencyPlot.CapturePointer(0);
-            _mouseState = MouseState.Clicked;
-            _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, frequencyPlot.worldBound.size);
-        }
-
-        void FrequencyPlot_PointerUp(PointerUpEvent pointerUpEvent) 
-        {
-            var frequencyPlot = (VisualElement)pointerUpEvent.target;
-            if (_frequencyMousePosition != null && !frequencyPlot.ContainsPointWithBorders(_frequencyMousePosition.Value))
-            {
-                HandlePlotPointerHover(frequencyPlot, null,
-                    ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-
-                var amplitudePlot = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints);
-                Vector2 amplitudePlotLocalPointerPosition = amplitudePlot.WorldToLocal(pointerUpEvent.position);
-                if (amplitudePlot.ContainsPoint(amplitudePlotLocalPointerPosition))
-                {
-                    HandlePlotPointerHover(amplitudePlot, amplitudePlotLocalPointerPosition,
-                        ref _amplitudeMousePosition, "Amplitude", Controls.FrequencyPlotPoints);
-                }
-            }
-            else if (pointerUpEvent.button == (int)MouseButton.LeftMouse)
-            {
-                Vector2 plotSize = frequencyPlot.worldBound.size;
-                if (_mouseState == MouseState.Clicked)
-                {
-                    Vector2 point = PlotToRealPoint(pointerUpEvent.localPosition, plotSize);
-                    if (TryGetContinuousEvent(point.x, out ContinuousEvent ce))
-                        ce.AddPointToCurve(point, MouseLocation.SharpnessPlot);
-                    else
-                        _Events.Add(new TransientEvent(point, MouseLocation.SharpnessPlot));
-                }
-                else if (_mouseState == MouseState.Dragging)
-                {
-                    Vector2 firstPoint = PlotToRealPoint(_dragStartPosition.Value, plotSize);
-                    Vector2 secondPoint = PlotToRealPoint(pointerUpEvent.localPosition, plotSize);
-                    if (secondPoint.x < firstPoint.x)
-                        (firstPoint, secondPoint) = (secondPoint, firstPoint);
-
-                    if (!AnyContinuousEventsExist(firstPoint.x, secondPoint.x))
-                        _Events.Add(new ContinuousEvent(firstPoint, secondPoint, MouseLocation.SharpnessPlot));
-                }
-                HandlePlotPointerHover(frequencyPlot, pointerUpEvent.localPosition,
-                    ref _frequencyMousePosition, "Frequency", Controls.AmplitudePlotPoints);
-            }
-
-            frequencyPlot.ReleasePointer(0);
-            _dragStartPosition = null;
-            _mouseState = MouseState.Unclicked;
-        }
-
-        void HandlePlotPointerHover(IEventHandler target, Vector2? pointerPosition, 
-            ref Vector2? positionCache, string plotName, string otherPlotElement)
-        {
-            VisualElement plot = (VisualElement)target;
-            plot.MarkDirtyRepaint();
-            rootVisualElement.Q<VisualElement>(otherPlotElement).MarkDirtyRepaint();
+            RepaintPoints();
             var hoverPlotName = rootVisualElement.Q<Label>(Controls.HoverPlotName);
             var hoverTime = rootVisualElement.Q<Label>(Controls.HoverTime);
             var hoverValue = rootVisualElement.Q<Label>(Controls.HoverValue);
             if (pointerPosition != null)
             {
-                _hoverPoint = GetPointOnPosition(PlotToRealPoint(pointerPosition.Value, plot.worldBound.size),
-                    plotName == "Amplitude" ? MouseLocation.IntensityPlot : MouseLocation.SharpnessPlot);
-                positionCache = SnapPointerPosition(pointerPosition.Value, plot.worldBound.size);
-                hoverPlotName.text = plotName;
-                Vector2 clampedPointerPosition = PlotToRealPoint(positionCache.Value, plot.worldBound.size);
+                Vector2 plotSize = hoverPlotInfo.Plot.worldBound.size;
+                _hoverPoint = GetPointOnPosition(PlotToRealPoint(pointerPosition.Value, hoverPlotInfo.Plot.worldBound.size),
+                    hoverPlotInfo.MouseLocation);
+                hoverPlotInfo.MousePosition = SnapPointerPosition(pointerPosition.Value, plotSize);
+                hoverPlotName.text = hoverPlotInfo.Name;
+                Vector2 clampedPointerPosition = PlotToRealPoint(hoverPlotInfo.MousePosition.Value, plotSize);
                 clampedPointerPosition.x = Mathf.Clamp(clampedPointerPosition.x, 0, _Time);
                 clampedPointerPosition.y = Mathf.Clamp01(clampedPointerPosition.y);
                 hoverTime.text = clampedPointerPosition.x.ToString();
@@ -872,7 +749,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
             else
             {
-                positionCache = null;
+                hoverPlotInfo.MousePosition = null;
                 hoverPlotName.text = hoverTime.text = hoverValue.text = "-";
                 _hoverPoint = null;
             }
@@ -956,22 +833,24 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             return false;
         }
 
-        bool TryGetContinuousEvents(float time1, float time2, out List<ContinuousEvent> continuousEvents)
+        bool TryGetContinuousEventsInRange(float time1, float time2, out List<ContinuousEvent> continuousEvents)
         {
             continuousEvents = new List<ContinuousEvent>();
             foreach (var ev in _Events) 
             {
-                if (ev is ContinuousEvent ce && (time1 <= ce.IntensityCurve[^1].Time && time2 >= ce.Time))
+                if (ev is ContinuousEvent ce && time1 <= ce.IntensityCurve[^1].Time && time2 >= ce.Time)
                     continuousEvents.Add(ce);
             }
             return continuousEvents.Count > 0;
         }
 
-        bool AnyContinuousEventsExist(float time1, float time2)
+        bool AnyContinuousEventsInRange(float time1, float time2)
         {
+            if (time1 > time2)
+                (time1, time2) = (time2, time1);
             foreach (var ev in _Events)
             {
-                if (ev is ContinuousEvent ce && (time2 >= ce.Time && time1 <= ce.IntensityCurve[^1].Time))
+                if (ev is ContinuousEvent ce && time2 >= ce.Time && time1 <= ce.IntensityCurve[^1].Time)
                     return true;
             }
             return false;
@@ -979,9 +858,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         EventPoint GetPointOnPosition(Vector2 plotPosition, MouseLocation plot)
         {
-            if (plot == MouseLocation.Outside) 
-                return null;
-
             var plotElement = rootVisualElement.Q<VisualElement>(plot == MouseLocation.IntensityPlot ? 
                 Controls.AmplitudePlot : Controls.FrequencyPlot);
             Vector2 plotSize = plotElement.worldBound.size;
@@ -1004,5 +880,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [InspectorName("0.001")] Thousandth = 3
     }
 
-    internal enum PointDragMode { FreeMove = 0, LockTime = 1, LockValue = 2 }
+    internal enum PointDragMode 
+    {
+        FreeMove = 0,
+        LockTime = 1,
+        LockValue = 2
+    }
+
+    internal class PlotInfo
+    {
+        public VisualElement Plot;
+        public VisualElement PlotPoints;
+        public VisualElement PlotWaveform;
+        public VisualElement XAxisLabelsParent;
+        public VisualElement YAxisLabelsParent;
+        public Vector2? MousePosition = null;
+        public string Name;
+        public MouseLocation MouseLocation;
+    }
 }

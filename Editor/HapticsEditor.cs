@@ -8,12 +8,13 @@ using UnityEditor.UIElements;
 using PopupWindow = UnityEditor.PopupWindow;
 using Object = UnityEngine.Object;
 using Chroma.UIToolkit.Utility;
+using System.Text;
 
 //TODO: remove AHAPEditor from name and namespace
 //TODO: fold queries with 1 change to one line
 namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    public partial class HapticsEditor : EditorWindow
+    public partial class HapticsEditor : EditorWindow, IHasCustomMenu
     {
         internal class USS
         {
@@ -94,7 +95,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const float HoverGuideCircleRadius = 4f;
             public const int MinBottomPanelWidth = 200;
             public const float HoverOffset = 5f;
-            public const float HoverHighlightSize = 9f;
+            public const float HoverHighlightSize = 11f;
         }
 
         //TODO: move to stylesheet?
@@ -136,6 +137,46 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         PlotInfo _amplitudePlotInfo;
         PlotInfo _frequencyPlotInfo;
 
+        public void AddItemsToMenu(GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Events to console"), false, () => DebugEvents());
+        }
+
+        void DebugEvents()
+        {
+            StringBuilder sb = new("[HapticsEditor] Events: ");
+            if (_Events == null || _Events.Count == 0) 
+            {
+                sb.Append("None");
+            }
+            else
+            {
+                sb.AppendLine(_Events.Count.ToString());
+                foreach (var e in _Events)
+                {
+                    switch(e)
+                    {
+                        case TransientEvent:
+                            sb.Append("Transient | ");
+                            break;
+                        case ContinuousEvent:
+                            sb.Append("Continuous | ");
+                            break;
+                        default: 
+                            break;
+                    }
+                    sb.Append(e.Time);
+                    if (e is ContinuousEvent ce)
+                    {
+                        sb.AppendFormat("-{0}, {1} Intensity points, {2} Sharpness points",
+                            ce.TimeMax, ce.IntensityCurve.Count, ce.SharpnessCurve.Count);
+                    }
+                    sb.AppendLine();
+                }
+            }
+            Debug.Log(sb.ToString());
+        }
+
         [MenuItem("Window/Haptics Editor")]
         public static void OpenWindow()
         {
@@ -175,8 +216,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void Clear()
         {
+            _Events?.Clear();
             _Events ??= new List<HapticEvent>();
-            _Events.Clear();
             RepaintPoints();
         }
 
@@ -220,6 +261,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             waveformRenderScaleField.SetValueWithoutNotify(_WaveformRenderScale);
             waveformRenderScaleField.RegisterValueChangedCallback(OnWaveformRenderScaleChanged);
             var waveformHeightMultiplierField = rootVisualElement.Q<Slider>(Controls.WaveformHeightMultiplier);
+            waveformHeightMultiplierField.lowValue = Settings.WaveformHeightMultiplierMin;
+            waveformHeightMultiplierField.highValue = Settings.WaveformHeightMultiplierMax;
             waveformHeightMultiplierField.SetValueWithoutNotify(_WaveformHeightMultiplier);
             waveformHeightMultiplierField.RegisterValueChangedCallback(OnWaveformHeightMultiplierChanged);
             var amplitudePlotWaveform = rootVisualElement.Q<Image>(Controls.AmplitudePlotWaveform);
@@ -227,12 +270,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             amplitudePlotWaveform.scaleMode = frequencyPlotWaveform.scaleMode = ScaleMode.StretchToFill;
             amplitudePlotWaveform.tintColor = frequencyPlotWaveform.tintColor = Colors.waveform;
             
-            // Zoom field/slider + reset button
+            // Zoom field/slider
             var zoomSlider = rootVisualElement.Q<Slider>(Controls.ZoomField);
             zoomSlider.lowValue = 1;
             zoomSlider.highValue = Settings.ZoomMax;
             zoomSlider.SetValueWithoutNotify(_zoom);
             zoomSlider.RegisterValueChangedCallback(OnZoomValueChanged);
+
+            // Zoom reset button
             var resetZoomButton = rootVisualElement.Q<Button>(Controls.ZoomResetButton);
             resetZoomButton.clicked += () => UpdateZoom(1);
 
@@ -450,6 +495,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Vector2 scrollOffset = plotScroll.scrollOffset;
             scrollOffset.x = _scrollOffset;
             plotScroll.scrollOffset = scrollOffset;
+
+            RepaintPoints();
         }
 
         void SetScrollOffset(GeometryChangedEvent geometryChangedEvent)
@@ -482,10 +529,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _Time = Mathf.Clamp(changeEvent.newValue, GetMinTime(), Settings.TimeMax);
             ((FloatField)changeEvent.target).SetValueWithoutNotify(_Time);
             RepaintAudioWaveform();
-            var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
-            plotScroll.MarkDirtyRepaint();
             DrawXAxisLabels(rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotXAxisLabels));
             DrawXAxisLabels(rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotXAxisLabels));
+            RepaintPoints();
         }
 
         void TrimTime()
@@ -493,7 +539,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _Time = GetMinTime();
             var timeField = rootVisualElement.Q<FloatField>(Controls.TimeField);
             timeField.value = _Time;
-            RepaintPoints();
         }
 
         void OnWaveformAssetChanged(ChangeEvent<Object> changeEvent)
@@ -568,20 +613,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 }
                 else if (hapticEvent is ContinuousEvent continuousEvent)
                 {
-                    List<Vector2> points = new();
                     List<EventPoint> curve = plotInfo.MouseLocation == MouseLocation.IntensityPlot ?
                         continuousEvent.IntensityCurve : continuousEvent.SharpnessCurve;
+                    var points = new Vector2[curve.Count + 2];
                     Vector2 plotPoint = RealToPlotPoint(new Vector2(continuousEvent.Time, 0), plotSize);
-                    points.Add(plotPoint);
-                    foreach (var realPoint in curve)
+                    points[0] = plotPoint;
+                    for (int i = 0; i < curve.Count; i++)
                     {
-                        plotPoint = RealToPlotPoint(realPoint, plotSize);
-                        points.Add(plotPoint);
+                        plotPoint = RealToPlotPoint(curve[i], plotSize);
+                        points[i + 1] = plotPoint;
                         painter.DrawFilledCircle(plotPoint, Settings.EventPointRadius, Colors.eventContinuous);
                     }
                     plotPoint = RealToPlotPoint(new Vector2(continuousEvent.TimeMax, 0), plotSize);
-                    points.Add(plotPoint);
-                    painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points.ToArray());
+                    points[^1] = plotPoint;
+                    painter.DrawLine(Settings.EventLineWidth, Colors.eventContinuous, false, LineJoin.Bevel, points);
                 }
             }
 
@@ -701,24 +746,60 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 if (otherPlot.ContainsPoint(otherPlotLocalPointerPosition))
                     HandlePlotPointerHover(plotInfos.Item2, otherPlotLocalPointerPosition);
             }
-            else if (pointerUpEvent.button == (int)MouseButton.LeftMouse)
+            else
             {
-                Vector2 plotSize = thisPlot.worldBound.size;
-                if (_mouseState == MouseState.Clicked)
+                if (pointerUpEvent.button == (int)MouseButton.LeftMouse)
                 {
-                    Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotSize);
-                    if (TryGetContinuousEvent(point.x, out ContinuousEvent ce))
-                        ce.AddPointToCurve(point, plotInfos.Item1.MouseLocation);
-                    else
-                        _Events.Add(new TransientEvent(point, plotInfos.Item1.MouseLocation));
+                    if (_hoverPoint == null)
+                    {
+                        Vector2 plotSize = thisPlot.worldBound.size;
+                        if (_mouseState == MouseState.Clicked)
+                        {
+                            Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotSize);
+                            if (TryGetContinuousEvent(point.x, out ContinuousEvent ce))
+                                ce.AddPointToCurve(point, plotInfos.Item1.MouseLocation);
+                            else
+                                _Events.Add(new TransientEvent(point, plotInfos.Item1.MouseLocation));
+                        }
+                        else if (_mouseState == MouseState.Dragging)
+                        {
+                            Vector2 firstPoint = PlotToRealPoint(_dragStartPosition.Value, plotSize);
+                            Vector2 secondPoint = SnapPointerPosition(pointerUpEvent.localPosition, plotSize);
+                            secondPoint = PlotToRealPoint(secondPoint, plotSize);
+                            if (!AnyContinuousEventsInRange(firstPoint.x, secondPoint.x))
+                                _Events.Add(new ContinuousEvent(firstPoint, secondPoint, plotInfos.Item1.MouseLocation));
+                        }
+                    }
                 }
-                else if (_mouseState == MouseState.Dragging)
+                else
                 {
-                    Vector2 firstPoint = PlotToRealPoint(_dragStartPosition.Value, plotSize);
-                    Vector2 secondPoint = SnapPointerPosition(pointerUpEvent.localPosition, plotSize);
-                    secondPoint = PlotToRealPoint(secondPoint, plotSize);
-                    if (!AnyContinuousEventsInRange(firstPoint.x, secondPoint.x))
-                        _Events.Add(new ContinuousEvent(firstPoint, secondPoint, plotInfos.Item1.MouseLocation));
+                    bool removeEvent = false;
+                    if (pointerUpEvent.button == (int)MouseButton.RightMouse)
+                    {
+                        removeEvent = _hoverPoint.ParentEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, plotInfos.Item1.MouseLocation);
+                        if (!removeEvent)
+                        {
+                            //_selectedPoints.Remove(_hoverPoint);
+                            _hoverPoint = null;
+                        }
+                    }
+                    else if (pointerUpEvent.button == (int)(MouseButton.MiddleMouse)) 
+                    {
+                        removeEvent = true;
+                    }
+
+                    if (removeEvent)
+                    {
+                        //if (_hoverPoint.ParentEvent is TransientEvent && _selectedPoints.Contains(_hoverPoint))
+                        //    _selectedPoints.Remove(_hoverPoint);
+                        //else if (_hoverPoint.ParentEvent is ContinuousEvent ce && _selectedPointsLocation == plotInfos.Item1.MouseLocation)
+                        //{
+                        //    var curve = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
+                        //    foreach (var point in curve)
+                        //        _selectedPoints.Remove(point);
+                        //}
+                        _Events.Remove(_hoverPoint.ParentEvent);
+                    }
                 }
                 HandlePlotPointerHover(plotInfos.Item1, pointerUpEvent.localPosition);
             }
@@ -736,8 +817,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var hoverValue = rootVisualElement.Q<Label>(Controls.HoverValue);
             if (pointerPosition != null)
             {
-                Vector2 plotSize = hoverPlotInfo.Plot.worldBound.size;
-                _hoverPoint = GetPointOnPosition(PlotToRealPoint(pointerPosition.Value, hoverPlotInfo.Plot.worldBound.size),
+                Vector2 plotSize = hoverPlotInfo.PlotPoints.worldBound.size;
+                _hoverPoint = GetPointOnPosition(PlotToRealPoint(pointerPosition.Value, plotSize),
                     hoverPlotInfo.MouseLocation);
                 hoverPlotInfo.MousePosition = SnapPointerPosition(pointerPosition.Value, plotSize);
                 hoverPlotName.text = hoverPlotInfo.Name;
@@ -835,6 +916,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         bool TryGetContinuousEventsInRange(float time1, float time2, out List<ContinuousEvent> continuousEvents)
         {
+            if (time1 > time2)
+                (time1, time2) = (time2, time1);
             continuousEvents = new List<ContinuousEvent>();
             foreach (var ev in _Events) 
             {

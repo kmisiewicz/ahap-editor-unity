@@ -32,6 +32,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public static implicit operator Vector2(EventPoint point) => new Vector2(point.Time, point.Value);
     }
 
+    [Serializable]
     internal abstract class HapticEvent : IComparable<HapticEvent>
     {
         public abstract float Time { get; }
@@ -52,6 +53,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         public abstract List<Pattern> ToAHAP();
     }
 
+    [Serializable]
     internal class TransientEvent : HapticEvent
     {
         public EventPoint Intensity;
@@ -113,6 +115,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         }
     }
 
+    [Serializable]
     internal class ContinuousEvent : HapticEvent
     {
         public List<EventPoint> IntensityCurve;

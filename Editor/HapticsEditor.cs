@@ -487,16 +487,30 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 UpdateZoom(newZoom);
             }
             else if (_zoom > 1f)
+            {
                 _scrollOffset += contentWidth * Mathf.Sign(wheelEvent.delta.y) * Settings.ScrollDelta;
+            }
             else
+            {
                 return;
+            }
 
             _scrollOffset = Mathf.Clamp(_scrollOffset, 0, contentWidth - viewportWidth);
             Vector2 scrollOffset = plotScroll.scrollOffset;
             scrollOffset.x = _scrollOffset;
             plotScroll.scrollOffset = scrollOffset;
 
-            RepaintPoints();
+            PlotInfo plotInfo = null;
+            if (_amplitudePlotInfo.MousePosition != null)
+                plotInfo = _amplitudePlotInfo;
+            else if (_frequencyPlotInfo.MousePosition != null)
+                plotInfo = _frequencyPlotInfo;
+            if (plotInfo != null)
+            {
+                Vector2 position = plotInfo.MousePosition.Value;
+                position.x = _scrollOffset + wheelEvent.localMousePosition.x;
+                HandlePlotPointerHover(plotInfo, position);
+            }
         }
 
         void SetScrollOffset(GeometryChangedEvent geometryChangedEvent)

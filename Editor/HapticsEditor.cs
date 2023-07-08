@@ -96,6 +96,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const int MinBottomPanelWidth = 200;
             public const float HoverOffset = 5f;
             public const float HoverHighlightSize = 11f;
+            public const float NeighbourPointOffset = 0.001f;
         }
 
         //TODO: move to stylesheet?
@@ -133,16 +134,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         MouseState _mouseState;
         Vector2? _dragStartPosition;
         EventPoint _hoverPoint;
-
+        EventPoint _draggedPoint;
+        List<EventPoint> _selectedPoints;
+        MouseLocation _selectedPointsLocation;
         PlotInfo _amplitudePlotInfo;
         PlotInfo _frequencyPlotInfo;
+        float _dragMin, _dragMax, _dragMinBound, _dragMaxBound;
+        float _dragValueMin, _dragValueMax, _dragValueMinBound, _dragValueMaxBound;
 
         public void AddItemsToMenu(GenericMenu menu)
         {
-            menu.AddItem(new GUIContent("Events to console"), false, () => DebugEvents());
+            menu.AddItem(new GUIContent("Log Events"), false, () => LogEvents());
         }
 
-        void DebugEvents()
+        void LogEvents()
         {
             StringBuilder sb = new("[HapticsEditor] Events: ");
             if (_Events == null || _Events.Count == 0) 
@@ -212,12 +217,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _dragStartPosition = null;
             _mouseState = MouseState.Unclicked;
             _hoverPoint = null;
+            _draggedPoint = null;
+            _selectedPoints ??= new List<EventPoint>();
         }
 
         void Clear()
         {
             _Events?.Clear();
             _Events ??= new List<HapticEvent>();
+            _selectedPoints?.Clear();
+            _selectedPoints ??= new List<EventPoint>();
             RepaintPoints();
         }
 
@@ -339,13 +348,13 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             amplitudePlotPoints.RegisterCallback<PointerEnterEvent, (PlotInfo, PlotInfo)>(Plot_PointerEntered, (_amplitudePlotInfo, _frequencyPlotInfo));
             amplitudePlotPoints.RegisterCallback<PointerMoveEvent, (PlotInfo, PlotInfo)>(Plot_PointerMoved, (_amplitudePlotInfo, _frequencyPlotInfo));
             amplitudePlotPoints.RegisterCallback<PointerOutEvent, (PlotInfo, PlotInfo)>(Plot_PointerOut, (_amplitudePlotInfo, _frequencyPlotInfo));
-            amplitudePlotPoints.RegisterCallback<PointerDownEvent>(Plot_PointerDown);
+            amplitudePlotPoints.RegisterCallback<PointerDownEvent, (PlotInfo, PlotInfo)>(Plot_PointerDown, (_amplitudePlotInfo, _frequencyPlotInfo));
             amplitudePlotPoints.RegisterCallback<PointerUpEvent, (PlotInfo, PlotInfo)>(Plot_PointerUp, (_amplitudePlotInfo, _frequencyPlotInfo));
             amplitudePlotPoints.generateVisualContent += AmplitudePlot_GenerateVisualContent;
             frequencyPlotPoints.RegisterCallback<PointerEnterEvent, (PlotInfo, PlotInfo)>(Plot_PointerEntered, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.RegisterCallback<PointerMoveEvent, (PlotInfo, PlotInfo)>(Plot_PointerMoved, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.RegisterCallback<PointerOutEvent, (PlotInfo, PlotInfo)>(Plot_PointerOut, (_frequencyPlotInfo, _amplitudePlotInfo));
-            frequencyPlotPoints.RegisterCallback<PointerDownEvent>(Plot_PointerDown);
+            frequencyPlotPoints.RegisterCallback<PointerDownEvent, (PlotInfo, PlotInfo)>(Plot_PointerDown, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.RegisterCallback<PointerUpEvent, (PlotInfo, PlotInfo)>(Plot_PointerUp, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.generateVisualContent += FrequencyPlot_GenerateVisualContent;
         }
@@ -652,21 +661,44 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     DrawHoverGuides(context, mousePosition);
                     if (_mouseState == MouseState.Dragging)
                     {
-                        Vector2 firstPoint = _dragStartPosition.Value;
-                        Vector2 secondPoint = mousePosition;
-                        Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
-                        Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
-                        Color gizmoColor = AnyContinuousEventsInRange(leftPoint.x, rightPoint.x) ?
-                            Colors.invalid : Colors.eventContinuousCreation;
-                        painter.DrawPolygon(gizmoColor, true, new Vector2(firstPoint.x, plotSize.y),
-                            firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
+                        if (_draggedPoint == null)
+                        {
+                            Vector2 firstPoint = _dragStartPosition.Value;
+                            Vector2 secondPoint = mousePosition;
+                            Vector2 leftPoint = PlotToRealPoint(firstPoint, plotSize);
+                            Vector2 rightPoint = PlotToRealPoint(secondPoint, plotSize);
+                            Color gizmoColor = AnyContinuousEventsInRange(leftPoint.x, rightPoint.x) ?
+                                Colors.invalid : Colors.eventContinuousCreation;
+                            painter.DrawPolygon(gizmoColor, true, new Vector2(firstPoint.x, plotSize.y),
+                                firstPoint, secondPoint, new Vector2(secondPoint.x, plotSize.y));
+                        }
                     }
                 }
                 else if (mousePosition.x > 0)
+                {
                     DrawVerticalHoverGuide(context, mousePosition);
+                }
             }
             else if (otherPlotInfo.MousePosition != null)
+            {
                 DrawVerticalHoverGuide(context, otherPlotInfo.MousePosition.Value);
+            }
+
+            if (_draggedPoint != null)
+            {
+                Vector2[] points = new Vector2[2] { RealToPlotPoint(new Vector2(_dragMinBound, _dragValueMinBound), plotSize),
+                    RealToPlotPoint(new Vector2(_dragMinBound, _dragValueMaxBound), plotSize) };
+                painter.DrawLine(Settings.HoverGuideLineWidth, Colors.dragBounds, points: points);
+                points[0] = RealToPlotPoint(_dragMaxBound, _dragValueMinBound, plotSize);
+                points[1] = RealToPlotPoint(_dragMaxBound, _dragValueMaxBound, plotSize);
+                painter.DrawLine(Settings.HoverGuideLineWidth, Colors.dragBounds, points: points);
+                points[0] = RealToPlotPoint(_dragMinBound, _dragValueMinBound, plotSize);
+                points[1] = RealToPlotPoint(_dragMaxBound, _dragValueMinBound, plotSize);
+                painter.DrawLine(Settings.HoverGuideLineWidth, Colors.dragBounds, points: points);
+                points[0] = RealToPlotPoint(_dragMinBound, _dragValueMaxBound, plotSize);
+                points[1] = RealToPlotPoint(_dragMaxBound, _dragValueMaxBound, plotSize);
+                painter.DrawLine(Settings.HoverGuideLineWidth, Colors.dragBounds, points: points);
+            }
         }
 
         void AmplitudePlot_GenerateVisualContent(MeshGenerationContext context)
@@ -724,7 +756,41 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void Plot_PointerMoved(PointerMoveEvent pointerMoveEvent, (PlotInfo, PlotInfo) plotInfos)
         {
-            if (_mouseState == MouseState.Clicked)
+            if (_mouseState == MouseState.Dragging && _draggedPoint != null)
+            {
+                Vector2 plotSize = plotInfos.Item1.Plot.worldBound.size;
+                Vector2 dragStart = PlotToRealPoint(_dragStartPosition.Value, plotSize);
+                Vector2 offset = PlotToRealPoint(SnapPointerPosition(pointerMoveEvent.localPosition, plotSize), plotSize) - dragStart;
+                offset.x = Mathf.Clamp(offset.x, _dragMin, _dragMax);
+                offset.y = Mathf.Clamp(offset.y, _dragValueMin, _dragValueMax);
+                Vector2 newDragPointPosition = dragStart + offset;
+                offset = newDragPointPosition - _draggedPoint;
+
+                PointDragMode pointDragMode = (PointDragMode)rootVisualElement.Q<RadioButtonGroup>(Controls.PointDragRadioGroup).value;
+                if (pointDragMode == PointDragMode.LockTime || pointerMoveEvent.altKey)
+                    offset.x = 0;
+                if (pointDragMode == PointDragMode.LockValue || pointerMoveEvent.shiftKey)
+                    offset.y = 0;
+
+                foreach (var point in _selectedPoints)
+                {
+                    point.Time += offset.x;
+                    point.Value += offset.y;
+
+                    if (point.ParentEvent is TransientEvent te)
+                    {
+                        te.Intensity.Time = te.Sharpness.Time = point.Time;
+                    }
+                    else if (point.ParentEvent is ContinuousEvent ce)
+                    {
+                        if (point == ce.IntensityCurve.First() || point == ce.SharpnessCurve.First())
+                            ce.IntensityCurve.First().Time = ce.SharpnessCurve.First().Time = point.Time;
+                        else if (point == ce.IntensityCurve.Last() || point == ce.SharpnessCurve.Last())
+                            ce.IntensityCurve.Last().Time = ce.SharpnessCurve.Last().Time = point.Time;
+                    }
+                }
+            }
+            else if (_mouseState == MouseState.Clicked)
             {
                 Vector2 point = PlotToRealPoint(_dragStartPosition.Value, plotInfos.Item1.Plot.worldBound.size);
                 _mouseState = TryGetContinuousEvent(point.x, out _) ? MouseState.Unclicked : MouseState.Dragging;
@@ -740,12 +806,103 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 HandlePlotPointerHover(plotInfos.Item1, null);
         }
 
-        void Plot_PointerDown(PointerDownEvent pointerDownEvent)
+        void Plot_PointerDown(PointerDownEvent pointerDownEvent, (PlotInfo, PlotInfo) plotInfos)
         {
             var plot = (VisualElement)pointerDownEvent.target;
             plot.CapturePointer(0);
             _mouseState = MouseState.Clicked;
             _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, plot.worldBound.size);
+
+            if (_hoverPoint != null)
+            {
+                if (!_selectedPoints.Contains(_hoverPoint))
+                {
+                    _selectedPoints.Clear();
+                    _selectedPoints.Add(_hoverPoint);
+                    _selectedPointsLocation = plotInfos.Item1.MouseLocation;
+                }
+
+                _mouseState = MouseState.Dragging;
+
+                _draggedPoint = _hoverPoint;
+                var plotScrollContainter = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
+                float plotScrollWidth = plotInfos.Item1.Plot.worldBound.width;
+                _dragMin = _scrollOffset / plotScrollWidth * _Time - _selectedPoints[0].Time;
+                _dragMax = (_scrollOffset + plotScrollContainter.worldBound.width) / plotScrollWidth * _Time - _selectedPoints[^1].Time;
+                _dragValueMin = 1;
+                _dragValueMax = 0;
+
+                EventPoint cePoint = null;
+                foreach (var point in _selectedPoints)
+                {
+                    if (point.ParentEvent is ContinuousEvent ce)
+                    {
+                        cePoint ??= point;
+
+                        (List<EventPoint> dragCurve, List<EventPoint> otherCurve) = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ?
+                            (ce.IntensityCurve, ce.SharpnessCurve) : (ce.SharpnessCurve, ce.IntensityCurve);
+                        if (point == dragCurve[0])
+                        {
+                            var nextPoint = otherCurve.Find(p => p.Time > cePoint.Time);
+                            if (nextPoint != null) _dragMax = Mathf.Min(_dragMax, nextPoint.Time - Settings.NeighbourPointOffset - cePoint.Time);
+                        }
+                        else if (point == dragCurve.Last())
+                        {
+                            var previousPoint = otherCurve.FindLast(p => p.Time < point.Time);
+                            if (previousPoint != null) _dragMin = Mathf.Max(_dragMin, previousPoint.Time + Settings.NeighbourPointOffset - point.Time);
+                        }
+                    }
+
+                    _dragValueMin = Mathf.Min(_dragValueMin, point.Value);
+                    _dragValueMax = Mathf.Max(_dragValueMax, point.Value);
+                }
+                _dragValueMin = -_dragValueMin;
+                _dragValueMinBound = ((Vector2)_draggedPoint).y + _dragValueMin;
+                _dragValueMax = -(_dragValueMax - 1);
+                _dragValueMaxBound = ((Vector2)_draggedPoint).y + _dragValueMax;
+
+                if (cePoint != null)
+                {
+                    var ce = (ContinuousEvent)cePoint.ParentEvent;
+                    (List<EventPoint> dragCurve, List<EventPoint> otherCurve) = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ?
+                        (ce.IntensityCurve, ce.SharpnessCurve) : (ce.SharpnessCurve, ce.IntensityCurve);
+                    if (cePoint == dragCurve[0])
+                    {
+                        var previousEvent = _Events.FindLast(ev => ev.Time < cePoint.Time && ev is ContinuousEvent);
+                        if (previousEvent != null)
+                            _dragMin = Mathf.Max(_dragMin, ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + Settings.NeighbourPointOffset - cePoint.Time);
+                    }
+                    else
+                    {
+                        var previousPoint = dragCurve.FindLast(p => p.Time < cePoint.Time);
+                        if (previousPoint != null) _dragMin = Mathf.Max(_dragMin, previousPoint.Time + Settings.NeighbourPointOffset - cePoint.Time);
+                    }
+
+                    for (int i = _selectedPoints.Count - 1; i >= 0; i--)
+                    {
+                        if (_selectedPoints[i].ParentEvent is ContinuousEvent ce2)
+                        {
+                            cePoint = _selectedPoints[i];
+                            (dragCurve, otherCurve) = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ?
+                                (ce2.IntensityCurve, ce2.SharpnessCurve) : (ce2.SharpnessCurve, ce2.IntensityCurve);
+                            if (cePoint == dragCurve.Last())
+                            {
+                                var nextEvent = _Events.Find(ev => ev.Time > cePoint.Time && ev is ContinuousEvent);
+                                if (nextEvent != null) _dragMax = Mathf.Min(_dragMax, nextEvent.Time - Settings.NeighbourPointOffset - cePoint.Time);
+                            }
+                            else
+                            {
+                                var nextPoint = dragCurve.Find(p => p.Time > cePoint.Time);
+                                if (nextPoint != null) _dragMax = Mathf.Min(_dragMax, nextPoint.Time - Settings.NeighbourPointOffset - cePoint.Time);
+                            }
+                            break;
+                        }
+                    }
+
+                    _dragMinBound = _selectedPoints[0].Time + _dragMin;
+                    _dragMaxBound = _selectedPoints[^1].Time + _dragMax;
+                }
+            }
         }
 
         void Plot_PointerUp(PointerUpEvent pointerUpEvent, (PlotInfo, PlotInfo) plotInfos)
@@ -793,7 +950,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         removeEvent = _hoverPoint.ParentEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, plotInfos.Item1.MouseLocation);
                         if (!removeEvent)
                         {
-                            //_selectedPoints.Remove(_hoverPoint);
+                            _selectedPoints.Remove(_hoverPoint);
                             _hoverPoint = null;
                         }
                     }
@@ -804,14 +961,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
                     if (removeEvent)
                     {
-                        //if (_hoverPoint.ParentEvent is TransientEvent && _selectedPoints.Contains(_hoverPoint))
-                        //    _selectedPoints.Remove(_hoverPoint);
-                        //else if (_hoverPoint.ParentEvent is ContinuousEvent ce && _selectedPointsLocation == plotInfos.Item1.MouseLocation)
-                        //{
-                        //    var curve = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
-                        //    foreach (var point in curve)
-                        //        _selectedPoints.Remove(point);
-                        //}
+                        if (_hoverPoint.ParentEvent is TransientEvent/* && _selectedPoints.Contains(_hoverPoint)*/)
+                        {
+                            _selectedPoints.Remove(_hoverPoint);
+                        }
+                        else if (_hoverPoint.ParentEvent is ContinuousEvent ce && _selectedPointsLocation == plotInfos.Item1.MouseLocation)
+                        {
+                            var curve = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
+                            foreach (var point in curve)
+                                _selectedPoints.Remove(point);
+                        }
                         _Events.Remove(_hoverPoint.ParentEvent);
                     }
                 }
@@ -820,6 +979,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             thisPlot.ReleasePointer(0);
             _dragStartPosition = null;
+            _draggedPoint = null;
             _mouseState = MouseState.Unclicked;
         }
 
@@ -912,6 +1072,12 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             return new Vector2(realPosition.x / _Time * plotSize.x,
                 plotSize.y - (realPosition.y * plotSize.y));
+        }
+
+        Vector2 RealToPlotPoint(float realPositionX, float realPositionY, Vector2 plotSize)
+        {
+            return new Vector2(realPositionX / _Time * plotSize.x,
+                plotSize.y - (realPositionY * plotSize.y));
         }
 
         bool TryGetContinuousEvent(float time, out ContinuousEvent continuousEvent)

@@ -81,13 +81,6 @@
             <ui:VisualElement style="flex-shrink: 0; width: 10px;" />
         </ui:VisualElement>
         <ui:VisualElement name="advancedPanel" usage-hints="DynamicColor" class="options-bar" style="overflow: visible; display: flex; flex-direction: column;">
-            <ui:VisualElement name="selectionPanel" class="options-bar-panel">
-                <ui:Label text="Selection" name="selectionLabel" class="label-normal" style="-unity-font-style: bold;" />
-                <ui:FloatField label="Time" value="0.5" name="selectionTimeField" style="display: none;" />
-                <ui:FloatField label="Sharpness" value="0.5" name="selectionValueField" style="display: none;" />
-                <ui:Label tabindex="-1" text="No" display-tooltip-when-elided="true" name="selectionLabelTop" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
-                <ui:Label tabindex="-1" text="selection" display-tooltip-when-elided="true" name="selectionLabelBottom" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
-            </ui:VisualElement>
             <ui:VisualElement name="mouseOptionsPanel" class="options-bar-panel">
                 <ui:Label text="Mouse Options" name="mouseOptionsLabel" class="label-normal" style="-unity-font-style: bold;" />
                 <ui:VisualElement name="mouseOptionsContainer" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
@@ -113,6 +106,13 @@
                 </ui:Button>
             </ui:VisualElement>
             <ui:VisualElement style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);" />
+            <ui:VisualElement name="selectionPanel" class="options-bar-panel">
+                <ui:Label text="Selection" name="selectionLabel" class="label-normal" style="-unity-font-style: bold;" />
+                <ui:FloatField label="Time" value="0.5" name="selectionTimeField" style="display: none;" />
+                <ui:FloatField label="Sharpness" value="0.5" name="selectionValueField" style="display: none;" />
+                <ui:Label tabindex="-1" text="No" display-tooltip-when-elided="true" name="selectionLabelTop" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
+                <ui:Label tabindex="-1" text="selection" display-tooltip-when-elided="true" name="selectionLabelBottom" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
+            </ui:VisualElement>
             <ui:VisualElement name="hoverInfo" class="options-bar-panel" style="flex-grow: 0;">
                 <ui:Label text="Hover Info" name="hoverInfoLabel" class="label-normal" style="-unity-font-style: bold;" />
                 <ui:VisualElement name="hoverPlot" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row; justify-content: space-between;">

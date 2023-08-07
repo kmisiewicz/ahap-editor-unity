@@ -108,10 +108,18 @@
             <ui:VisualElement style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);" />
             <ui:VisualElement name="selectionPanel" class="options-bar-panel">
                 <ui:Label text="Selection" name="selectionLabel" class="label-normal" style="-unity-font-style: bold;" />
-                <ui:FloatField label="Time" value="0.5" name="selectionTimeField" style="display: none;" />
-                <ui:FloatField label="Sharpness" value="0.5" name="selectionValueField" style="display: none;" />
-                <ui:Label tabindex="-1" text="No" display-tooltip-when-elided="true" name="selectionLabelTop" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
-                <ui:Label tabindex="-1" text="selection" display-tooltip-when-elided="true" name="selectionLabelBottom" class="label-normal" style="-unity-text-align: upper-center; display: flex;" />
+                <ui:VisualElement name="selectionSingle" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); display: none;">
+                    <ui:FloatField label="Time" value="0.5" name="selectionTimeField" />
+                    <ui:FloatField label="Sharpness" value="0.5" name="selectionValueField" />
+                </ui:VisualElement>
+                <ui:VisualElement name="selectionNone" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <ui:Label tabindex="-1" text="No" display-tooltip-when-elided="true" name="selectionNoneTop" class="label-normal" style="-unity-text-align: upper-left; display: flex;" />
+                    <ui:Label tabindex="-1" text="selection" display-tooltip-when-elided="true" name="selectionNoneBottom" class="label-normal" style="-unity-text-align: upper-left; display: flex;" />
+                </ui:VisualElement>
+                <ui:VisualElement name="selectionMulti" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); display: none;">
+                    <ui:Label tabindex="-1" text="Selected:" display-tooltip-when-elided="true" name="selectionMultiTop" class="label-normal" style="-unity-text-align: upper-left; display: flex;" />
+                    <ui:Label tabindex="-1" text="0 Amplitude points" display-tooltip-when-elided="true" name="selectionMultiCount" class="label-normal" style="-unity-text-align: upper-left; display: flex;" />
+                </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="hoverInfo" class="options-bar-panel" style="flex-grow: 0;">
                 <ui:Label text="Hover Info" name="hoverInfoLabel" class="label-normal" style="-unity-font-style: bold;" />

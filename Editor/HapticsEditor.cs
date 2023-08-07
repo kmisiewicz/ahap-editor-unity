@@ -67,7 +67,14 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             public const string FrequencyPlotPoints = "frequencyPlotPoints";
             public const string FrequencyPlotYAxisLabels = "frequencyPlotYLabels";
             public const string FrequencyPlotXAxisLabels = "frequencyPlotXAxisLabels";
-            
+
+            public const string SelectionNone = "selectionNone";
+            public const string SelectionSingle = "selectionSingle";
+            public const string SelectionSingleTime = "selectionTimeField";
+            public const string SelectionSingleValue = "selectionValueField";
+            public const string SelectionMulti = "selectionMulti";
+            public const string SelectionMultiData = "selectionMultiCount";
+
             public const string HoverPlotName = "hoverPlotName";
             public const string HoverTime = "hoverTimeNumber";
             public const string HoverValue = "hoverValueNumber";
@@ -229,6 +236,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _Events ??= new List<HapticEvent>();
             _selectedPoints?.Clear();
             _selectedPoints ??= new List<EventPoint>();
+            RefreshSelectionInfo();
             RepaintPoints();
         }
 
@@ -359,6 +367,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             frequencyPlotPoints.RegisterCallback<PointerDownEvent, (PlotInfo, PlotInfo)>(Plot_PointerDown, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.RegisterCallback<PointerUpEvent, (PlotInfo, PlotInfo)>(Plot_PointerUp, (_frequencyPlotInfo, _amplitudePlotInfo));
             frequencyPlotPoints.generateVisualContent += FrequencyPlot_GenerateVisualContent;
+
+            RefreshSelectionInfo();
         }
 
         void PlotScroll_GeometryChanged(GeometryChangedEvent geometryChangedEvent)
@@ -619,7 +629,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var painter = context.painter2D;
             Vector2 plotSize = context.visualElement.worldBound.size;
 
-            if (plotInfo.MousePosition != null && _selectingPoints)
+            if (plotInfo.MousePosition != null && _mouseState != MouseState.Unclicked && _selectingPoints)
             {
                 Vector2 firstPoint = _dragStartPosition.Value;
                 Vector2 secondPoint = SnapPointerPosition(plotInfo.MousePosition.Value, plotSize);
@@ -705,7 +715,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 DrawVerticalHoverGuide(context, otherPlotInfo.MousePosition.Value);
             }
 
-            if (_draggedPoint != null)
+            if (_draggedPoint != null && _selectedPoints.Any(x => x.ParentEvent is ContinuousEvent))
             {
                 Vector2[] points = new Vector2[2] { RealToPlotPoint(new Vector2(_dragMinBound, _dragValueMinBound), plotSize),
                     RealToPlotPoint(new Vector2(_dragMinBound, _dragValueMaxBound), plotSize) };
@@ -832,7 +842,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             _dragStartPosition = SnapPointerPosition(pointerDownEvent.localPosition, plot.worldBound.size);
 
             MouseMode mouseMode = (MouseMode)rootVisualElement.Q<RadioButtonGroup>(Controls.MouseModeRadioGroup).value;
-            _selectingPoints = mouseMode == MouseMode.Select || (mouseMode == MouseMode.AddRemove && pointerDownEvent.ctrlKey);
+            _selectingPoints = (mouseMode == MouseMode.Select && !pointerDownEvent.ctrlKey)
+                || (mouseMode != MouseMode.Select && pointerDownEvent.ctrlKey);
 
             if (_selectingPoints)
                 _mouseState = MouseState.Dragging;
@@ -844,6 +855,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     _selectedPoints.Clear();
                     _selectedPoints.Add(_hoverPoint);
                     _selectedPointsLocation = plotInfos.Item1.MouseLocation;
+                    RefreshSelectionInfo();
                 }
 
                 _mouseState = MouseState.Dragging;
@@ -980,7 +992,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         }
                         _selectedPoints.Sort();
                         _selectedPointsLocation = plotInfos.Item1.MouseLocation;
-                        _selectingPoints = false;
                     }
                     else if (_hoverPoint == null)
                     {
@@ -1003,45 +1014,56 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                         }
                     }
                 }
-                else
+                else if (_hoverPoint != null)
                 {
-                    bool removeEvent = false;
-                    if (pointerUpEvent.button == (int)MouseButton.RightMouse)
+                    if (_selectingPoints && _mouseState != MouseState.Unclicked)
                     {
-                        removeEvent = _hoverPoint.ParentEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, plotInfos.Item1.MouseLocation);
-                        if (!removeEvent)
+                        if (pointerUpEvent.button == (int)MouseButton.MiddleMouse)
+                            SelectHoverEvent(plotInfos.Item1);
+                    }
+                    else
+                    {
+                        bool removeEvent = false;
+                        if (pointerUpEvent.button == (int)MouseButton.RightMouse)
                         {
-                            _selectedPoints.Remove(_hoverPoint);
-                            _hoverPoint = null;
+                            removeEvent = _hoverPoint.ParentEvent.ShouldRemoveEventAfterRemovingPoint(_hoverPoint, plotInfos.Item1.MouseLocation);
+                            if (!removeEvent)
+                            {
+                                _selectedPoints.Remove(_hoverPoint);
+                                _hoverPoint = null;
+                            }
                         }
-                    }
-                    else if (pointerUpEvent.button == (int)(MouseButton.MiddleMouse)) 
-                    {
-                        removeEvent = true;
-                    }
+                        else if (pointerUpEvent.button == (int)MouseButton.MiddleMouse)
+                        {
+                            removeEvent = true;
+                        }
 
-                    if (removeEvent)
-                    {
-                        if (_hoverPoint.ParentEvent is TransientEvent/* && _selectedPoints.Contains(_hoverPoint)*/)
+                        if (removeEvent)
                         {
-                            _selectedPoints.Remove(_hoverPoint);
+                            if (_hoverPoint.ParentEvent is TransientEvent)
+                            {
+                                _selectedPoints.Remove(_hoverPoint);
+                            }
+                            else if (_hoverPoint.ParentEvent is ContinuousEvent ce)
+                            {
+                                foreach (var point in ce.IntensityCurve)
+                                    _selectedPoints.Remove(point);
+                                foreach (var point in ce.SharpnessCurve)
+                                    _selectedPoints.Remove(point);
+                            }
+                            _Events.Remove(_hoverPoint.ParentEvent);
                         }
-                        else if (_hoverPoint.ParentEvent is ContinuousEvent ce && _selectedPointsLocation == plotInfos.Item1.MouseLocation)
-                        {
-                            var curve = plotInfos.Item1.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
-                            foreach (var point in curve)
-                                _selectedPoints.Remove(point);
-                        }
-                        _Events.Remove(_hoverPoint.ParentEvent);
                     }
                 }
                 HandlePlotPointerHover(plotInfos.Item1, pointerUpEvent.localPosition);
             }
 
+            RefreshSelectionInfo();
             thisPlot.ReleasePointer(0);
             _dragStartPosition = null;
             _draggedPoint = null;
             _mouseState = MouseState.Unclicked;
+            _selectingPoints = false;
         }
 
         void HandlePlotPointerHover(PlotInfo hoverPlotInfo, Vector2? pointerPosition)
@@ -1090,6 +1112,138 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             }
 
             amplitudePlotWaveform.image = frequencyPlotWaveform.image = _waveformTexture;
+        }
+
+        void RefreshSelectionInfo()
+        {
+            var none = rootVisualElement.Q<VisualElement>(Controls.SelectionNone);
+            var single = rootVisualElement.Q<VisualElement>(Controls.SelectionSingle);
+            var multi = rootVisualElement.Q<VisualElement>(Controls.SelectionMulti);
+
+            switch (_selectedPoints.Count) 
+            {
+                case 0:
+                    none.style.display = DisplayStyle.Flex;
+                    single.style.display = DisplayStyle.None;
+                    single.Q<FloatField>(Controls.SelectionSingleTime).UnregisterValueChangedCallback(SingleSelectionTimeChanged);
+                    single.Q<FloatField>(Controls.SelectionSingleValue).UnregisterValueChangedCallback(SingleSelectionValueChanged);
+                    multi.style.display = DisplayStyle.None;
+                    break;
+                case 1:
+                    none.style.display = DisplayStyle.None;
+                    single.style.display = DisplayStyle.Flex;
+                    var singleTime = single.Q<FloatField>(Controls.SelectionSingleTime);
+                    singleTime.SetValueWithoutNotify(_selectedPoints[0].Time);
+                    singleTime.RegisterValueChangedCallback(SingleSelectionTimeChanged);
+                    var singleValue = single.Q<FloatField>(Controls.SelectionSingleValue);
+                    singleValue.SetValueWithoutNotify(_selectedPoints[0].Value);
+                    singleValue.RegisterValueChangedCallback(SingleSelectionValueChanged);
+                    multi.style.display = DisplayStyle.None;
+                    break;
+                default:
+                    none.style.display = DisplayStyle.None;
+                    single.style.display = DisplayStyle.None;
+                    single.Q<FloatField>(Controls.SelectionSingleTime).UnregisterValueChangedCallback(SingleSelectionTimeChanged);
+                    single.Q<FloatField>(Controls.SelectionSingleValue).UnregisterValueChangedCallback(SingleSelectionValueChanged);
+                    multi.style.display = DisplayStyle.Flex;
+                    multi.Q<Label>(Controls.SelectionMultiData).text = $"{_selectedPoints.Count} {_selectedPointsLocation} points";
+                    break;
+            }
+        }
+
+        void SingleSelectionTimeChanged(ChangeEvent<float> changeEvent)
+        {
+            EventPoint point = _selectedPoints[0];
+            var plotScrollContainter = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
+            float plotScrollWidth = rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotPoints).worldBound.width;
+            _dragMin = _scrollOffset / plotScrollWidth * _Time - point.Time;
+            _dragMax = (_scrollOffset + plotScrollContainter.worldBound.width) / plotScrollWidth * _Time - point.Time;
+
+            if (point.ParentEvent is ContinuousEvent ce)
+            {
+                (List<EventPoint> dragCurve, List<EventPoint> otherCurve) = _selectedPointsLocation == MouseLocation.IntensityPlot ?
+                    (ce.IntensityCurve, ce.SharpnessCurve) : (ce.SharpnessCurve, ce.IntensityCurve);
+                if (point == dragCurve[0])
+                {
+                    var nextPoint = otherCurve.Find(p => p.Time > point.Time);
+                    if (nextPoint != null)
+                        _dragMax = Mathf.Min(_dragMax, nextPoint.Time - Settings.NeighbourPointOffset - point.Time);
+                }
+                else if (point == dragCurve[^1])
+                {
+                    var previousPoint = otherCurve.FindLast(p => p.Time < point.Time);
+                    if (previousPoint != null)
+                        _dragMin = Mathf.Max(_dragMin, previousPoint.Time + Settings.NeighbourPointOffset - point.Time);
+                }
+
+                if (point == dragCurve[0])
+                {
+                    var previousEvent = _Events.FindLast(ev => ev.Time < point.Time && ev is ContinuousEvent);
+                    if (previousEvent != null)
+                        _dragMin = Mathf.Max(_dragMin, ((ContinuousEvent)previousEvent).IntensityCurve.Last().Time + Settings.NeighbourPointOffset - point.Time);
+                }
+                else
+                {
+                    var previousPoint = dragCurve.FindLast(p => p.Time < point.Time);
+                    if (previousPoint != null)
+                        _dragMin = Mathf.Max(_dragMin, previousPoint.Time + Settings.NeighbourPointOffset - point.Time);
+                }
+
+                if (point == dragCurve.Last())
+                {
+                    var nextEvent = _Events.Find(ev => ev.Time > point.Time && ev is ContinuousEvent);
+                    if (nextEvent != null)
+                        _dragMax = Mathf.Min(_dragMax, nextEvent.Time - Settings.NeighbourPointOffset - point.Time);
+                }
+                else
+                {
+                    var nextPoint = dragCurve.Find(p => p.Time > point.Time);
+                    if (nextPoint != null)
+                        _dragMax = Mathf.Min(_dragMax, nextPoint.Time - Settings.NeighbourPointOffset - point.Time);
+                }
+            }
+
+            _dragMinBound = point.Time + _dragMin;
+            _dragMaxBound = point.Time + _dragMax;
+
+            float time = Mathf.Clamp(changeEvent.newValue, _dragMinBound, _dragMaxBound);
+            ((FloatField)changeEvent.target).SetValueWithoutNotify(time);
+            if (point.ParentEvent is TransientEvent transientEvent)
+            {
+                transientEvent.Sharpness.Time = transientEvent.Intensity.Time = time;
+            }
+            else if (point.ParentEvent is ContinuousEvent continuousEvent)
+            {
+                if (point.Time == continuousEvent.IntensityCurve.First().Time || point.Time == continuousEvent.SharpnessCurve.First().Time)
+                    continuousEvent.IntensityCurve.First().Time = continuousEvent.SharpnessCurve.First().Time = time;
+                else if (point.Time == continuousEvent.IntensityCurve.Last().Time || point.Time == continuousEvent.SharpnessCurve.Last().Time)
+                    continuousEvent.IntensityCurve.Last().Time = continuousEvent.SharpnessCurve.Last().Time = time;
+                else
+                    point.Time = time;
+            }
+
+            RepaintPoints();
+        }
+
+        void SingleSelectionValueChanged(ChangeEvent<float> changeEvent)
+        {
+            float value = Mathf.Clamp01(changeEvent.newValue);
+            ((FloatField)changeEvent.target).SetValueWithoutNotify(value);
+            _selectedPoints[0].Value = value;
+            RepaintPoints();
+        }
+
+        void SelectHoverEvent(PlotInfo currentPlotInfo)
+        {
+            _selectedPoints.Clear();
+            if (_hoverPoint.ParentEvent is TransientEvent)
+                _selectedPoints.Add(_hoverPoint);
+            else if (_hoverPoint.ParentEvent is ContinuousEvent ce)
+            {
+                var curve = currentPlotInfo.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
+                _selectedPoints.AddRange(curve);
+            }
+            _selectedPointsLocation = currentPlotInfo.MouseLocation;
         }
 
         float GetMinTime()

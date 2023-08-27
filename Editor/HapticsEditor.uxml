@@ -13,7 +13,7 @@
         <ui:VisualElement name="wavePanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top" style="overflow: visible;">
             <ui:Label text="Waveform" name="waveLabel" class="label-normal" style="-unity-font-style: bold;" />
             <ui:VisualElement name="waveContainer" style="flex-direction: row; overflow: hidden; align-items: center;">
-                <uie:ObjectField name="waveformField" type="UnityEngine.AudioClip, UnityEngine.AudioModule" allow-scene-objects="false" style="flex-shrink: 1; align-items: flex-start; margin-right: 0;" />
+                <uie:ObjectField name="waveformField" type="UnityEngine.AudioClip, UnityEngine.AudioModule" allow-scene-objects="false" binding-path="_WaveformClip" style="flex-shrink: 1; align-items: flex-start; margin-right: 0;" />
                 <ui:Button display-tooltip-when-elided="true" name="playButton" class="button-array-left" style="height: 90%; margin-top: 0; margin-bottom: 0;">
                     <ui:Image name="playIcon" class="button-image" style="--unity-image: resource(&apos;d_PlayButton&apos;); flex-shrink: 0; margin-left: -1px; margin-right: -1px; margin-top: -1px; margin-bottom: -1px;" />
                 </ui:Button>
@@ -22,22 +22,22 @@
                 </ui:Button>
             </ui:VisualElement>
             <ui:VisualElement name="waveVisibility" style="flex-direction: row;">
-                <uie:ToolbarToggle focusable="false" label="Visible" name="waveVisibleToggle" class="toggle-button button-array-left toggle-button-label toggle-button-checkmark" style="width: 50%;" />
-                <uie:ToolbarToggle focusable="false" label="Normalize" name="waveNormalizeToggle" class="toggle-button button-array-right toggle-button-label toggle-button-checkmark" style="width: 50%;" />
+                <uie:ToolbarToggle focusable="false" label="Visible" name="waveVisibleToggle" binding-path="_WaveformVisible" class="toggle-button button-array-left toggle-button-label toggle-button-checkmark" style="width: 50%;" />
+                <uie:ToolbarToggle focusable="false" label="Normalize" name="waveNormalizeToggle" binding-path="_WaveformNormalize" class="toggle-button button-array-right toggle-button-label toggle-button-checkmark" style="width: 50%;" />
             </ui:VisualElement>
             <ui:VisualElement name="waveParams" style="flex-grow: 0; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
-                <uie:FloatField label="Quality" value="1" name="waveRenderScale" is-delayed="true" tooltip="Plot resolution will be multiplied by this value before rendering waveform texture." class="short-field-label" style="width: 50%; flex-shrink: 1; flex-grow: 1;" />
-                <ui:Slider picking-mode="Ignore" label="H Multi" value="1" high-value="4" name="waveHeightMultiplier" low-value="0.1" show-input-field="true" class="short-field-label slider-text-field" style="flex-shrink: 1; flex-grow: 1; width: 50%; overflow: hidden;" />
+                <uie:FloatField label="Quality" value="1" name="waveRenderScale" is-delayed="true" tooltip="Plot resolution will be multiplied by this value before rendering waveform texture." binding-path="_WaveformRenderScale" class="short-field-label" style="width: 50%; flex-shrink: 1; flex-grow: 1;" />
+                <ui:Slider picking-mode="Ignore" label="H Multi" value="1" high-value="4" name="waveHeightMultiplier" low-value="0.1" show-input-field="true" binding-path="_WaveformHeightMultiplier" class="short-field-label slider-text-field" style="flex-shrink: 1; flex-grow: 1; width: 50%; overflow: hidden;" />
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="plotViewPanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
             <ui:Label text="Plot View" name="plotViewLabel" class="label-normal" style="-unity-font-style: bold;" />
             <ui:VisualElement name="zoomControl" style="flex-direction: row; overflow: hidden;">
-                <ui:Slider picking-mode="Ignore" label="Zoom" value="1" high-value="7" low-value="1" show-input-field="true" name="zoom" class="short-field-label slider-text-field" style="margin-top: 0; margin-bottom: 0; flex-grow: 1; flex-shrink: 1; overflow: hidden;" />
+                <ui:Slider picking-mode="Ignore" label="Zoom" value="1" high-value="7" low-value="1" show-input-field="true" name="zoom" binding-path="_Zoom" class="short-field-label slider-text-field" style="margin-top: 0; margin-bottom: 0; flex-grow: 1; flex-shrink: 1; overflow: hidden;" />
                 <ui:Button text="Reset" display-tooltip-when-elided="true" name="zoomResetButton" style="flex-shrink: 1; width: 30%; margin-top: 0; margin-bottom: 0;" />
             </ui:VisualElement>
             <ui:VisualElement name="timeControl" style="flex-direction: row;">
-                <uie:FloatField label="Time" value="1" name="timeValue" class="short-field-label" style="flex-shrink: 1; flex-grow: 1;" />
+                <uie:FloatField label="Time" value="1" name="timeValue" binding-path="_Time" class="short-field-label" style="flex-shrink: 1; flex-grow: 1;" />
                 <ui:Button text="Trim" display-tooltip-when-elided="true" name="trimButton" style="width: 30%; flex-shrink: 1;" />
             </ui:VisualElement>
         </ui:VisualElement>

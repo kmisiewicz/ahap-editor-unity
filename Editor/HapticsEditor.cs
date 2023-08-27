@@ -9,6 +9,7 @@ using PopupWindow = UnityEditor.PopupWindow;
 using Object = UnityEngine.Object;
 using Chroma.UIToolkit.Utility;
 using System.Text;
+using Chroma.Haptics.EditorWindow;
 
 //TODO: remove AHAPEditor from name and namespace
 //TODO: fold queries with 1 change to one line
@@ -134,9 +135,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [SerializeField] float _WaveformRenderScale;
         [SerializeField] float _WaveformHeightMultiplier;
         [SerializeField] float _Time;
+        [SerializeField] float _Zoom;
 
         Texture2D _waveformTexture;
-        float _zoom, _lastPaintedZoom;
+        float _lastPaintedZoom;
         float _scrollOffset;
         int _firstRepaintCounter;
         MouseState _mouseState;
@@ -153,7 +155,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public void AddItemsToMenu(GenericMenu menu)
         {
-            menu.AddItem(new GUIContent("Log Events"), false, () => LogEvents());
+            menu.AddItem(new GUIContent("Log Events"), false, LogEvents);
         }
 
         void LogEvents()
@@ -204,7 +206,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         void Initialize()
         {
             _Events ??= new List<HapticEvent>();
-            _zoom = _lastPaintedZoom = 1;
+            _Zoom = _lastPaintedZoom = 1;
             _scrollOffset = 0;
             float lastPointTime = GetLastPointTime();
             _Time = lastPointTime > 0 ? lastPointTime : Settings.TimeDefault;
@@ -250,13 +252,16 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         //TODO: Cache some frequently used controls
         public void CreateGUI()
         {
-            Initialize();
-
             var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Settings.UxmlPath);
             VisualElement windowUxml = visualTree.Instantiate();
             windowUxml.style.flexGrow = 1; // Fix for TemplateContainer not expanding
             rootVisualElement.Add(windowUxml);
             _firstRepaintCounter = 0;
+
+            SerializedObject so = new(this);
+            rootVisualElement.Bind(so);
+
+            Initialize();
 
             // Save button
             var saveButton = rootVisualElement.Q<Button>(Controls.SaveButton);
@@ -265,24 +270,19 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             // Waveform panel
             var waveformField = rootVisualElement.Q<ObjectField>(Controls.WaveformField);
             waveformField.RegisterValueChangedCallback(OnWaveformAssetChanged);
-            waveformField.value = _WaveformClip;
             var playButton = rootVisualElement.Q<Button>(Controls.PlayButton);
             playButton.clicked += () => AudioClipUtils.PlayClip(_WaveformClip);
             var stopButton = rootVisualElement.Q<Button>(Controls.StopButton);
             stopButton.clicked += AudioClipUtils.StopAllClips;
             var waveformVisibleToggle = rootVisualElement.Q<Toggle>(Controls.WaveformVisible);
-            waveformVisibleToggle.SetValueWithoutNotify(_WaveformVisible);
-            waveformVisibleToggle.RegisterValueChangedCallback(ToggleWaveformVisible);
+            waveformVisibleToggle.RegisterValueChangedCallback(OnWaveformBoolChanged);
             var waveformNormalizeToggle = rootVisualElement.Q<Toggle>(Controls.WaveformNormalize);
-            waveformNormalizeToggle.SetValueWithoutNotify(_WaveformNormalize);
-            waveformNormalizeToggle.RegisterValueChangedCallback(ToggleWaveformNormalize);
+            waveformNormalizeToggle.RegisterValueChangedCallback(OnWaveformBoolChanged);
             var waveformRenderScaleField = rootVisualElement.Q<FloatField>(Controls.WaveformRenderScale);
-            waveformRenderScaleField.SetValueWithoutNotify(_WaveformRenderScale);
             waveformRenderScaleField.RegisterValueChangedCallback(OnWaveformRenderScaleChanged);
             var waveformHeightMultiplierField = rootVisualElement.Q<Slider>(Controls.WaveformHeightMultiplier);
             waveformHeightMultiplierField.lowValue = Settings.WaveformHeightMultiplierMin;
             waveformHeightMultiplierField.highValue = Settings.WaveformHeightMultiplierMax;
-            waveformHeightMultiplierField.SetValueWithoutNotify(_WaveformHeightMultiplier);
             waveformHeightMultiplierField.RegisterValueChangedCallback(OnWaveformHeightMultiplierChanged);
             var amplitudePlotWaveform = rootVisualElement.Q<Image>(Controls.AmplitudePlotWaveform);
             var frequencyPlotWaveform = rootVisualElement.Q<Image>(Controls.FrequencyPlotWaveform);
@@ -293,7 +293,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             var zoomSlider = rootVisualElement.Q<Slider>(Controls.ZoomField);
             zoomSlider.lowValue = 1;
             zoomSlider.highValue = Settings.ZoomMax;
-            zoomSlider.SetValueWithoutNotify(_zoom);
             zoomSlider.RegisterValueChangedCallback(OnZoomValueChanged);
 
             // Zoom reset button
@@ -302,7 +301,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
             // Time field + trim button
             var timeField = rootVisualElement.Q<FloatField>(Controls.TimeField);
-            timeField.value = _Time;
             timeField.RegisterValueChangedCallback(OnTimeChanged);
             var trimButton = rootVisualElement.Q<Button>(Controls.TrimButton);
             trimButton.clicked += TrimTime;
@@ -499,7 +497,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             {
                 float scrollMouseX = _scrollOffset + wheelEvent.localMousePosition.x;
                 float posX = scrollMouseX / contentWidth;
-                float newZoom = _zoom - Mathf.Sign(wheelEvent.delta.y) * Settings.ZoomDelta;
+                float newZoom = _Zoom - Mathf.Sign(wheelEvent.delta.y) * Settings.ZoomDelta;
                 newZoom = Mathf.Clamp(newZoom, 1, Settings.ZoomMax);
                 contentWidth = viewportWidth * newZoom;
                 _scrollOffset = posX * contentWidth - wheelEvent.localMousePosition.x;
@@ -507,7 +505,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                     contentContainer.RegisterCallback<GeometryChangedEvent>(SetScrollOffset);
                 UpdateZoom(newZoom);
             }
-            else if (_zoom > 1f)
+            else if (_Zoom > 1f)
             {
                 _scrollOffset += contentWidth * Mathf.Sign(wheelEvent.delta.y) * Settings.ScrollDelta;
             }
@@ -537,9 +535,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         void SetScrollOffset(GeometryChangedEvent geometryChangedEvent)
         {
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
-            Vector2 scrollOffset = plotScroll.scrollOffset;
-            scrollOffset.x = _scrollOffset;
-            plotScroll.scrollOffset = scrollOffset;
+            plotScroll.scrollOffset = new Vector2(_scrollOffset, 0);
             plotScroll.contentContainer.UnregisterCallback<GeometryChangedEvent>(SetScrollOffset);
         }
 
@@ -547,22 +543,20 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         void UpdateZoom(float newZoom)
         {
-            var zoomSlider = rootVisualElement.Q<Slider>(Controls.ZoomField);
-            _zoom = (float)Math.Round(newZoom, 1);
-            zoomSlider.SetValueWithoutNotify(_zoom);
+            _Zoom = (float)Math.Round(newZoom, 1);
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
-            plotScroll.contentContainer.style.width = plotScroll.worldBound.width * newZoom;
-            if (_WaveformClip != null && Mathf.Abs(newZoom - _lastPaintedZoom) >= Settings.WaveformRepaintZoomThreshold)
+            plotScroll.contentContainer.style.width = plotScroll.worldBound.width * _Zoom;
+
+            if (_WaveformClip != null && Mathf.Abs(_Zoom - _lastPaintedZoom) >= Settings.WaveformRepaintZoomThreshold)
             {
                 RepaintAudioWaveform();
-                _lastPaintedZoom = newZoom;
+                _lastPaintedZoom = _Zoom;
             }
         }
 
         void OnTimeChanged(ChangeEvent<float> changeEvent)
         {
             _Time = Mathf.Clamp(changeEvent.newValue, GetMinTime(), Settings.TimeMax);
-            ((FloatField)changeEvent.target).SetValueWithoutNotify(_Time);
             RepaintAudioWaveform();
             DrawXAxisLabels(rootVisualElement.Q<VisualElement>(Controls.AmplitudePlotXAxisLabels));
             DrawXAxisLabels(rootVisualElement.Q<VisualElement>(Controls.FrequencyPlotXAxisLabels));
@@ -572,13 +566,10 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         void TrimTime()
         {
             _Time = GetMinTime();
-            var timeField = rootVisualElement.Q<FloatField>(Controls.TimeField);
-            timeField.value = _Time;
         }
 
         void OnWaveformAssetChanged(ChangeEvent<Object> changeEvent)
         {
-            _WaveformClip = changeEvent.newValue as AudioClip;
             bool clipExists = _WaveformClip != null;
             var waveformVisibility = rootVisualElement.Q<VisualElement>(Controls.WaveformVisibility);
             waveformVisibility.SetEnabled(clipExists);
@@ -593,15 +584,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             RepaintAudioWaveform();
         }
 
-        void ToggleWaveformVisible(ChangeEvent<bool> changeEvent) 
+        void OnWaveformBoolChanged(ChangeEvent<bool> changeEvent) 
         {
-            _WaveformVisible = changeEvent.newValue;
-            RepaintAudioWaveform();
-        }
-        
-        void ToggleWaveformNormalize(ChangeEvent<bool> changeEvent) 
-        {
-            _WaveformNormalize = changeEvent.newValue;
             RepaintAudioWaveform();
         }
 
@@ -609,7 +593,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _WaveformRenderScale = Mathf.Clamp(changeEvent.newValue,
                 Settings.WaveformRenderScaleMin, Settings.WaveformRenderScaleMax);
-            ((FloatField)changeEvent.target).SetValueWithoutNotify(_WaveformRenderScale);
             RepaintAudioWaveform();
         }
 
@@ -617,7 +600,6 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _WaveformHeightMultiplier = Mathf.Clamp(changeEvent.newValue,
                 Settings.WaveformHeightMultiplierMin, Settings.WaveformHeightMultiplierMax);
-            ((Slider)changeEvent.target).SetValueWithoutNotify(_WaveformHeightMultiplier);
             RepaintAudioWaveform();
         }
 
@@ -1371,6 +1353,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [InspectorName("Add/Remove")] AddRemove = 0,
         Select = 1
     }
+
+    public enum FileFormat { AHAP = 0, Haptic = 1 }
 
     internal class PlotInfo
     {

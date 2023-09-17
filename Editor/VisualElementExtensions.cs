@@ -7,7 +7,7 @@ namespace Chroma.UIToolkit.Utility
     {
         /// <summary>
         /// Returns <see cref="true"/> if <paramref name="point"/> is inside <see cref="VisualElement"/>'s <see cref="Rect"/>
-        /// In comparison to default <see cref="VisualElement.ContainsPoint(Vector2)"/> it includes the last pixels.
+        /// In comparison to default <see cref="VisualElement.ContainsPoint(Vector2)"/> it includes the border pixels.
         /// </summary>
         public static bool ContainsPointWithBorders(this VisualElement visualElement, Vector2 point)
         {

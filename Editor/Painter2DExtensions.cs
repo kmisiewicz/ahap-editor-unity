@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
     internal static class Painter2DExtensions
     {

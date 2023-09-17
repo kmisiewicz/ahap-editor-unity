@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 using DSPLib;
 
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
     internal static class AudioClipUtils
     {

@@ -3,12 +3,12 @@
     <ui:VisualElement name="topBar" class="options-bar" style="flex-direction: row;">
         <ui:VisualElement name="filePanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top">
             <ui:Label text="File" name="fileLabel" class="label-normal" style="-unity-font-style: bold;" />
-            <uie:ObjectField label="Asset" allow-scene-objects="false" name="assetField" type="UnityEngine.Object, UnityEngine.CoreModule" class="short-field-label" />
+            <uie:ObjectField label="Asset" allow-scene-objects="false" name="assetField" type="UnityEngine.Object, UnityEngine.CoreModule" binding-path="_VibrationAsset" class="short-field-label" />
             <ui:VisualElement name="fileOperations" style="flex-direction: row;">
                 <ui:Button text="Import" name="importButton" class="button-array-left" style="flex-shrink: 1; width: 50%;" />
                 <ui:Button text="Save" display-tooltip-when-elided="true" name="saveButton" class="button-array-right" style="flex-shrink: 1; width: 50%;" />
             </ui:VisualElement>
-            <ui:TextField picking-mode="Ignore" label="Project Name" name="projectNameField" class="short-field-label" style="opacity: 1; display: none; visibility: visible; overflow: hidden;" />
+            <ui:TextField picking-mode="Ignore" label="Project" name="projectNameField" binding-path="_ProjectName" class="short-field-label" />
         </ui:VisualElement>
         <ui:VisualElement name="wavePanel" usage-hints="DynamicColor" class="options-bar-panel options-bar-panel-top" style="overflow: visible;">
             <ui:Label text="Waveform" name="waveLabel" class="label-normal" style="-unity-font-style: bold;" />

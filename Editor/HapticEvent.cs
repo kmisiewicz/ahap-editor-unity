@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
     internal enum MouseLocation { Outside = 0, IntensityPlot = 1, SharpnessPlot = 2 }
 

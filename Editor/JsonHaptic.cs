@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
     internal class Amplitude
     {

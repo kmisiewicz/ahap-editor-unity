@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEditor;
@@ -8,14 +9,11 @@ using UnityEditor.UIElements;
 using PopupWindow = UnityEditor.PopupWindow;
 using Object = UnityEngine.Object;
 using Chroma.UIToolkit.Utility;
-using System.Text;
-using Chroma.Haptics.EditorWindow;
 
-//TODO: remove AHAPEditor from name and namespace
 //TODO: fold queries with 1 change to one line
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
-    public partial class HapticsEditor : EditorWindow, IHasCustomMenu
+    public partial class HapticsEditor : UnityEditor.EditorWindow, IHasCustomMenu
     {
         internal class USS
         {
@@ -129,6 +127,7 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         internal enum MouseState { Unclicked = 0, Clicked = 1, Dragging = 2 }
 
         [SerializeField] List<HapticEvent> _Events;
+        [SerializeField] Object _VibrationAsset;
         [SerializeField] AudioClip _WaveformClip;
         [SerializeField] bool _WaveformVisible;
         [SerializeField] bool _WaveformNormalize;
@@ -136,6 +135,8 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         [SerializeField] float _WaveformHeightMultiplier;
         [SerializeField] float _Time;
         [SerializeField] float _Zoom;
+        [SerializeField] string _ProjectName;
+        [SerializeField] string _ProjectVersion;
 
         Texture2D _waveformTexture;
         float _lastPaintedZoom;
@@ -252,21 +253,32 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         //TODO: Cache some frequently used controls
         public void CreateGUI()
         {
+            // Instantiate UXML template
             var visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Settings.UxmlPath);
             VisualElement windowUxml = visualTree.Instantiate();
             windowUxml.style.flexGrow = 1; // Fix for TemplateContainer not expanding
             rootVisualElement.Add(windowUxml);
             _firstRepaintCounter = 0;
 
+            // Bind data
             SerializedObject so = new(this);
             rootVisualElement.Bind(so);
 
             Initialize();
 
+            // Import button
+            var importButton = rootVisualElement.Q<Button>(Controls.ImportButton);
+            importButton.clicked += () => HapticsFileImporter.Import(_VibrationAsset, _Events, Clear, OnImportSuccess);
+
             // Save button
             var saveButton = rootVisualElement.Q<Button>(Controls.SaveButton);
-            saveButton.clicked += () => PopupWindow.Show(saveButton.worldBound, new SavePopup());
-
+            saveButton.clicked += () => PopupWindow.Show(saveButton.worldBound, new SavePopup(saveOptions =>
+            {
+                saveOptions.ProjectName = _ProjectName;
+                saveOptions.ProjectVersion = _ProjectVersion;
+                HapticsFileExporter.Export(_Events, saveOptions, ref _VibrationAsset);
+            }));
+            
             // Waveform panel
             var waveformField = rootVisualElement.Q<ObjectField>(Controls.WaveformField);
             waveformField.RegisterValueChangedCallback(OnWaveformAssetChanged);
@@ -1107,27 +1119,27 @@ namespace Chroma.Utility.Haptics.AHAPEditor
                 case 0:
                     none.style.display = DisplayStyle.Flex;
                     single.style.display = DisplayStyle.None;
+                    multi.style.display = DisplayStyle.None;
                     single.Q<FloatField>(Controls.SelectionSingleTime).UnregisterValueChangedCallback(SingleSelectionTimeChanged);
                     single.Q<FloatField>(Controls.SelectionSingleValue).UnregisterValueChangedCallback(SingleSelectionValueChanged);
-                    multi.style.display = DisplayStyle.None;
                     break;
                 case 1:
                     none.style.display = DisplayStyle.None;
                     single.style.display = DisplayStyle.Flex;
+                    multi.style.display = DisplayStyle.None;
                     var singleTime = single.Q<FloatField>(Controls.SelectionSingleTime);
                     singleTime.SetValueWithoutNotify(_selectedPoints[0].Time);
                     singleTime.RegisterValueChangedCallback(SingleSelectionTimeChanged);
                     var singleValue = single.Q<FloatField>(Controls.SelectionSingleValue);
                     singleValue.SetValueWithoutNotify(_selectedPoints[0].Value);
                     singleValue.RegisterValueChangedCallback(SingleSelectionValueChanged);
-                    multi.style.display = DisplayStyle.None;
                     break;
                 default:
                     none.style.display = DisplayStyle.None;
                     single.style.display = DisplayStyle.None;
+                    multi.style.display = DisplayStyle.Flex;
                     single.Q<FloatField>(Controls.SelectionSingleTime).UnregisterValueChangedCallback(SingleSelectionTimeChanged);
                     single.Q<FloatField>(Controls.SelectionSingleValue).UnregisterValueChangedCallback(SingleSelectionValueChanged);
-                    multi.style.display = DisplayStyle.Flex;
                     multi.Q<Label>(Controls.SelectionMultiData).text = $"{_selectedPoints.Count} {_selectedPointsLocation} points";
                     break;
             }
@@ -1219,13 +1231,22 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         {
             _selectedPoints.Clear();
             if (_hoverPoint.ParentEvent is TransientEvent)
+            {
                 _selectedPoints.Add(_hoverPoint);
+            }
             else if (_hoverPoint.ParentEvent is ContinuousEvent ce)
             {
                 var curve = currentPlotInfo.MouseLocation == MouseLocation.IntensityPlot ? ce.IntensityCurve : ce.SharpnessCurve;
                 _selectedPoints.AddRange(curve);
             }
             _selectedPointsLocation = currentPlotInfo.MouseLocation;
+        }
+
+        void OnImportSuccess(ImportData importData)
+        {
+            _Time = GetLastPointTime();
+            if (!string.IsNullOrEmpty(importData.ProjectName))
+                _ProjectName = importData.ProjectName;
         }
 
         float GetMinTime()
@@ -1354,7 +1375,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         Select = 1
     }
 
-    public enum FileFormat { AHAP = 0, Haptic = 1 }
+    public enum FileFormat
+    {
+        AHAP = 0,
+        Haptic = 1
+    }
 
     internal class PlotInfo
     {

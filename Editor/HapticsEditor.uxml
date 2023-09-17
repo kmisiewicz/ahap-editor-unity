@@ -49,7 +49,7 @@
                 <uie:ToolbarToggle focusable="true" label="Select" name="selectModeToggle" class="toggle-button-label toggle-button toggle-button-checkmark button-array-right button-strip-right" style="padding-left: 6px; padding-right: 6px; padding-bottom: 1px; left: auto; width: 50%; margin-top: 0; margin-bottom: 1px;" />
             </ui:VisualElement>
             <ui:VisualElement name="otherButtons" style="flex-direction: row; flex-grow: 1;">
-                <uie:ToolbarToggle focusable="false" label="Advanced Panel" name="advancedPanelToggle" class="toggle-button toggle-button-checkmark button-array-left toggle-button-label-wrap" style="flex-shrink: 1; margin-top: 0; width: 50%;" />
+                <uie:ToolbarToggle focusable="false" label="More Options" name="sidePanelToggle" class="toggle-button toggle-button-checkmark button-array-left toggle-button-label-wrap" style="flex-shrink: 1; margin-top: 0; width: 50%;" />
                 <ui:Button text="Clear" display-tooltip-when-elided="true" name="clearButton" class="button-array-right" style="flex-shrink: 1; margin-top: 0; width: 50%;" />
             </ui:VisualElement>
         </ui:VisualElement>
@@ -80,7 +80,7 @@
             </ui:ScrollView>
             <ui:VisualElement style="flex-shrink: 0; width: 10px;" />
         </ui:VisualElement>
-        <ui:VisualElement name="advancedPanel" usage-hints="DynamicColor" class="options-bar" style="overflow: visible; display: flex; flex-direction: column;">
+        <ui:VisualElement name="advancedPanel" usage-hints="DynamicColor" class="options-bar" style="overflow: visible; flex-direction: column;">
             <ui:VisualElement name="mouseOptionsPanel" class="options-bar-panel">
                 <ui:Label text="Mouse Options" name="mouseOptionsLabel" class="label-normal" style="-unity-font-style: bold;" />
                 <ui:VisualElement name="mouseOptionsContainer" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
@@ -96,11 +96,11 @@
             </ui:VisualElement>
             <ui:VisualElement name="audioAnalysisPanel" class="options-bar-panel">
                 <ui:Label text="Audio Analysis" name="audioAnalysisLabel" class="label-normal" style="-unity-font-style: bold;" />
-                <ui:Button display-tooltip-when-elided="true" text="Transients" name="transientsAnalysisButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
+                <ui:Button display-tooltip-when-elided="true" text="Transients" name="transientsOnsetsButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
                     <ui:Label tabindex="-1" text="Transients from onsets" display-tooltip-when-elided="true" name="transientsAnalysisLabel" class="label-button" />
                     <ui:Image name="dropdownArrow" class="button-image" style="--unity-image: resource(&apos;d_icon dropdown&apos;); height: 18px; margin-top: -2px; margin-bottom: -1px;" />
                 </ui:Button>
-                <ui:Button display-tooltip-when-elided="true" text="Continuous" name="continuousAnalysisButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
+                <ui:Button display-tooltip-when-elided="true" text="Continuous" name="continuousEnvelopeButton" style="color: rgba(238, 238, 238, 0); flex-direction: row; justify-content: space-between; padding-right: 3px;">
                     <ui:Label tabindex="-1" text="Continuous envelope" display-tooltip-when-elided="true" name="continuousAnalysisButton" class="label-button" />
                     <ui:Image name="dropdownArrow" class="button-image" style="--unity-image: resource(&apos;d_icon dropdown&apos;); height: 18px; margin-top: -2px; margin-bottom: -1px;" />
                 </ui:Button>

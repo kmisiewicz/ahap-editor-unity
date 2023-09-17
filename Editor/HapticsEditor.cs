@@ -9,6 +9,7 @@ using UnityEditor.UIElements;
 using PopupWindow = UnityEditor.PopupWindow;
 using Object = UnityEngine.Object;
 using Chroma.UIToolkit.Utility;
+using Chroma.Haptics.EditorWindow.Generation;
 
 //TODO: fold queries with 1 change to one line
 namespace Chroma.Haptics.EditorWindow
@@ -48,11 +49,15 @@ namespace Chroma.Haptics.EditorWindow
 
             public const string MouseModeRadioGroup = "mouseModeRadioGroup";
             public const string ClearButton = "clearButton";
+            public const string SidePanelToggle = "sidePanelToggle";
+            public const string BottomPart = "bottomPart";
 
             public const string PointDragRadioGroup = "pointDragRadioGroup";
             public const string SnapModeEnumField = "snappingEnum";
             
             public const string AudioAnalysisPanel = "audioAnalysisPanel";
+            public const string TransientsOnsetsGenerator = "transientsOnsetsButton";
+            public const string ContinuousEnvelopeGenerator = "continuousEnvelopeButton";
 
             public const string BottomPartSplitView = "bottomPart";
             public const string PlotScroll = "plotScroll";
@@ -325,9 +330,22 @@ namespace Chroma.Haptics.EditorWindow
             var clearButton = rootVisualElement.Q<Button>(Controls.ClearButton);
             clearButton.clicked += Clear;
 
+            // Side panel toggle
+            var sidePanelToggle = rootVisualElement.Q<Toggle>(Controls.SidePanelToggle);
+            sidePanelToggle.SetValueWithoutNotify(true);
+            sidePanelToggle.RegisterValueChangedCallback(ToggleSidePanel);
+
             // Point drag mode button strip
             var pointDragRadioGroup = rootVisualElement.Q<RadioButtonGroup>(Controls.PointDragRadioGroup);
             SetupRadioButtonStripStyle(pointDragRadioGroup);
+
+            // Generators
+            var transientsGeneratorButton = rootVisualElement.Q<Button>(Controls.TransientsOnsetsGenerator);
+            transientsGeneratorButton.clicked += () => PopupWindow.Show(transientsGeneratorButton.worldBound,
+                new TransientsGeneratorPopup(_WaveformClip, events =>
+                {
+                    _Events.AddRange(events);
+                }));
 
             // Plot scroll
             var plotScroll = rootVisualElement.Q<ScrollView>(Controls.PlotScroll);
@@ -379,6 +397,15 @@ namespace Chroma.Haptics.EditorWindow
             frequencyPlotPoints.generateVisualContent += FrequencyPlot_GenerateVisualContent;
 
             RefreshSelectionInfo();
+        }
+
+        void ToggleSidePanel(ChangeEvent<bool> change)
+        {
+            var bottomPart = rootVisualElement.Q<TwoPaneSplitView>(Controls.BottomPart);
+            if (change.newValue)
+                bottomPart.UnCollapse();
+            else
+                bottomPart.CollapseChild(1);
         }
 
         void PlotScroll_GeometryChanged(GeometryChangedEvent geometryChangedEvent)

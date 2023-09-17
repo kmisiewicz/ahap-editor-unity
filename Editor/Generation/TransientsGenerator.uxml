@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/com.chroma.ahapeditor/Editor/HapticsEditor.uss?fileID=7433441132597879392&amp;guid=379c47a84a5ba1b4bb32a076d8995460&amp;type=3#HapticsEditor" />
+    <ui:VisualElement style="height: 3px;" />
+    <ui:UnsignedIntegerField label="Chunk Size" value="1024" name="chunkSizeField" />
+    <ui:Slider label="Sensitivity" value="0.5" high-value="1" name="sensitivityField" show-input-field="true" />
+    <ui:Slider label="RMS Threshold" value="0.5" high-value="1" name="rmsThresholdField" show-input-field="true" />
+    <ui:VisualElement style="height: 10px;" />
+    <ui:Button text="Generate" parse-escape-sequences="true" name="generateButton" display-tooltip-when-elided="true" />
+</ui:UXML>

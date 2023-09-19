@@ -1,0 +1,23 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/com.chroma.ahapeditor/Editor/HapticsEditor.uss?fileID=7433441132597879392&amp;guid=379c47a84a5ba1b4bb32a076d8995460&amp;type=3#HapticsEditor" />
+    <ui:VisualElement style="height: 3px;" />
+    <ui:Label tabindex="-1" text="General Parameters" parse-escape-sequences="true" display-tooltip-when-elided="true" name="generalLabel" class="label-normal" style="-unity-font-style: bold;" />
+    <ui:Toggle label="Normalize" name="normalizeToggle" class="label-normal" />
+    <ui:FloatField label="Tolerance" value="0.05" name="toleranceField" />
+    <ui:VisualElement style="height: 10px;" />
+    <ui:Label tabindex="-1" text="Amplitude Generation" parse-escape-sequences="true" display-tooltip-when-elided="true" name="amplitudeLabel" class="label-normal" style="-unity-font-style: bold;" />
+    <ui:UnsignedIntegerField label="RMS Chunk" value="1024" name="rmsChunkField" />
+    <ui:VisualElement style="height: 10px;" />
+    <ui:Label tabindex="-1" text="Frequency Generation" parse-escape-sequences="true" display-tooltip-when-elided="true" name="frequencyLabel" class="label-normal" style="-unity-font-style: bold;" />
+    <ui:MinMaxSlider label="Filter" min-value="80" max-value="800" low-limit="20" high-limit="3000" name="filterSlider" />
+    <ui:VisualElement name="filterMinMaxFields" style="justify-content: center; flex-direction: row;">
+        <ui:UnsignedIntegerField value="80" name="filterMinField" is-delayed="true" style="flex-grow: 1;" />
+        <ui:Label text="-" name="dashLabel" class="label-normal" style="width: 10px;" />
+        <ui:UnsignedIntegerField value="800" name="filterMaxField" is-delayed="true" style="flex-grow: 1;" />
+    </ui:VisualElement>
+    <ui:UnsignedIntegerField label="FFT Chunk" value="1024" name="fftChunkField" />
+    <ui:Toggle label="Multiply by RMS" name="multiplyRmsToggle" />
+    <ui:Slider label="Lerp to RMS" value="0.5" high-value="1" name="lerpRmsField" show-input-field="true" />
+    <ui:VisualElement style="height: 10px;" />
+    <ui:Button text="Generate" parse-escape-sequences="true" name="generateButton" display-tooltip-when-elided="true" />
+</ui:UXML>

@@ -342,9 +342,19 @@ namespace Chroma.Haptics.EditorWindow
             // Generators
             var transientsGeneratorButton = rootVisualElement.Q<Button>(Controls.TransientsOnsetsGenerator);
             transientsGeneratorButton.clicked += () => PopupWindow.Show(transientsGeneratorButton.worldBound,
-                new TransientsGeneratorPopup(_WaveformClip, events =>
+                new TransientsOnsetsGenerator(_WaveformClip, events =>
                 {
                     _Events.AddRange(events);
+                    RepaintPoints();
+                }));
+
+            var continuousGeneratorButton = rootVisualElement.Q<Button>(Controls.ContinuousEnvelopeGenerator);
+            continuousGeneratorButton.clicked += () => PopupWindow.Show(continuousGeneratorButton.worldBound,
+                new ContinuousEnvelopeGenerator(_WaveformClip, events =>
+                {
+                    Clear();
+                    _Events.AddRange(events);
+                    RepaintPoints();
                 }));
 
             // Plot scroll

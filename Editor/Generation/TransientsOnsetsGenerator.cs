@@ -8,9 +8,9 @@ using DSPLib;
 
 namespace Chroma.Haptics.EditorWindow.Generation
 {
-    public class TransientsGeneratorPopup : PopupWindowContent, IHapticsGenerator
+    public class TransientsOnsetsGenerator : PopupWindowContent, IHapticsGenerator
     {
-        const string UXML_PATH = "Packages/com.chroma.ahapeditor/Editor/Generation/TransientsGenerator.uxml";
+        const string UXML_PATH = "Packages/com.chroma.ahapeditor/Editor/Generation/TransientsOnsetsGenerator.uxml";
         const string CHUNK_SIZE_FIELD = "chunkSizeField";
         const string SENSITIVITY_FIELD = "sensitivityField";
         const string RMS_THRESHOLD_FIELD = "rmsThresholdField";
@@ -19,7 +19,7 @@ namespace Chroma.Haptics.EditorWindow.Generation
         AudioClip _audioClip;
         Action<List<HapticEvent>> _onEventsGenerated;
 
-        public TransientsGeneratorPopup(AudioClip clip, Action<List<HapticEvent>> onEventsGenerated)
+        public TransientsOnsetsGenerator(AudioClip clip, Action<List<HapticEvent>> onEventsGenerated)
         {
             _audioClip = clip;
             _onEventsGenerated = onEventsGenerated;

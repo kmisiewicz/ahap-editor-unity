@@ -90,7 +90,7 @@
                     </ui:VisualElement>
                     <ui:VisualElement name="mouseOptionsFields" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
                         <ui:RadioButtonGroup value="0" choices="Free Move, Lock Time, Lock Value" name="pointDragRadioGroup" class="radio-button-strip-container radio-button-strip-button radio-button-strip-checkmark unity-button-strip-button-label radio-button-strip-input" />
-                        <ui:EnumField type="Chroma.Utility.Haptics.AHAPEditor.AHAPEditorWindow+SnapMode, com.chroma.ahapeditor.Editor" value="None" name="snappingEnum" class="short-field-label" />
+                        <ui:EnumField type="Chroma.Haptics.EditorWindow.SnapMode, com.chroma.hapticseditor.Editor" value="None" name="snappingEnum" class="short-field-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

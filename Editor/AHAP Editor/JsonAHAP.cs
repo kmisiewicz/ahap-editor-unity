@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Chroma.Haptics.EditorWindow
+namespace Chroma.Utility.Haptics.AHAPEditor
 {
     internal class Event
     {

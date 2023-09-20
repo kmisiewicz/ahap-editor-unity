@@ -5,14 +5,18 @@ using UnityEditor;
 using UnityEngine;
 using DSPLib;
 
-namespace Chroma.Utility.Haptics.AHAPEditor
+namespace Chroma.Haptics.EditorWindow
 {
-    internal class AudioClipUtils
+    internal static class AudioClipUtils
     {
         // Adjusted code from answers
         // https://answers.unity.com/questions/699595/how-to-generate-waveform-from-audioclip.html
-        public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, Color waveformColor, bool normalize = false)
+        public static Texture2D PaintAudioWaveform(AudioClip audio, int width, int height, Color backgroundColor, 
+            Color waveformColor, bool normalize = false, float heightMultiplier = 1f)
         {
+            if (width <= 0 || height <= 0)
+                return null;
+
             // Calculate samples
             float[] samples = GetMonoSamples(audio, normalize);
             float[] waveform = new float[width];
@@ -28,8 +32,11 @@ namespace Chroma.Utility.Haptics.AHAPEditor
             Texture2D texture = new(width, height, TextureFormat.RGBA32, false);
             texture.SetPixels32(Enumerable.Repeat((Color32)backgroundColor, width * height).ToArray());
             for (int x = 0; x < width; x++)
-                for (int y = 0; y <= waveform[x] * height; y++)
+            {
+                int maxY = (int)(Mathf.Clamp01(waveform[x] * heightMultiplier) * height);
+                for (int y = 0; y <= maxY; y++)
                     texture.SetPixel(x, y, waveformColor);
+            }
             texture.Apply();
 
             return texture;
@@ -39,6 +46,9 @@ namespace Chroma.Utility.Haptics.AHAPEditor
         // https://forum.unity.com/threads/way-to-play-audio-in-editor-using-an-editor-script.132042/#post-7015753
         public static void PlayClip(AudioClip clip, int startSample = 0, bool loop = false)
         {
+            if (clip == null) 
+                return;
+
             Assembly unityEditorAssembly = typeof(AudioImporter).Assembly;
             Type audioUtilClass = unityEditorAssembly.GetType("UnityEditor.AudioUtil");
             MethodInfo method = audioUtilClass.GetMethod(
@@ -69,14 +79,15 @@ namespace Chroma.Utility.Haptics.AHAPEditor
 
         public static float[] GetMonoSamples(AudioClip clip, bool normalize = false)
         {
-            float[] multiChannelSamples = new float[clip.channels * clip.samples];
+            int multiChannelSampleCount = clip.channels * clip.samples;
+            float[] multiChannelSamples = new float[multiChannelSampleCount];
             clip.GetData(multiChannelSamples, 0);
 
             float[] monoSamples = new float[clip.samples];
             int numProcessed = 0;
             float combinedChannelAverage = 0f;
             float maxValue = 0;
-            for (int i = 0; i < multiChannelSamples.Length; i++)
+            for (int i = 0; i < multiChannelSampleCount; i++)
             {
                 combinedChannelAverage += multiChannelSamples[i];
 

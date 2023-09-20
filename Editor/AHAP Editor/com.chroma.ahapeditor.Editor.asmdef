@@ -1,0 +1,19 @@
+{
+    "name": "com.chroma.ahapeditor.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:dba75ab218643764685a2107a81b7f87",
+        "GUID:1106d60fdb659644c9eab47d714778d5"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

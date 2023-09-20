@@ -1,3 +1,7 @@
+// Copyright © 2018 Jesse Keogh
+// https://github.com/jesse-scam/algorithmic-beat-mapping-unity
+// Slightly reformatted for better readability
+
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -14,18 +18,26 @@ public class SpectralFluxAnalyzer
 {
     public List<SpectralFluxInfo> SpectralFluxSamples;
 
-    // Sensitivity multiplier to scale the average threshold.
-    // In this case, if a rectified spectral flux sample is > 1.5 times the average, it is a peak
+    /// <summary>
+    /// Sensitivity multiplier to scale the average threshold.
+    /// If a rectified spectral flux sample value is larger than
+    /// <see cref="_thresholdMultiplier"/> times the average, it is a peak.
+    /// </summary>
     float _thresholdMultiplier = 1.5f;
 
-	int _sampleCount = 1024;
-	int _thresholdWindowSize = 50; // Number of samples to average in our window
+    /// <summary>
+    /// Number of samples to average in our window.
+    /// </summary>
+	int _thresholdWindowSize = 50;
 
+	int _sampleCount = 1024;
+	int _indexToProcess;
 	float[] _currentSpectrum;
 	float[] _previousSpectrum;
-	int _indexToProcess;
 
-	public SpectralFluxAnalyzer (int sampleChunkSize, float sensitivity) 
+	public int ThresholdWindowSize => _thresholdWindowSize;
+
+	public SpectralFluxAnalyzer(int sampleChunkSize, float sensitivity) 
 	{
 		_sampleCount = sampleChunkSize;
 		_thresholdMultiplier = 1f + sensitivity;
@@ -37,8 +49,6 @@ public class SpectralFluxAnalyzer
 		_currentSpectrum = new float[_sampleCount];
 		_previousSpectrum = new float[_sampleCount];
 	}
-
-	public int ThresholdWindowSize => _thresholdWindowSize;
 
     public void SetCurrentSpectrum(float[] spectrum)
     {

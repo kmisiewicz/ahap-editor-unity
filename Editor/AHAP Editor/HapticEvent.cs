@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace Chroma.Haptics.EditorWindow
+namespace Chroma.Utility.Haptics.AHAPEditor
 {
-    public enum MouseLocation { Outside = 0, IntensityPlot = 1, SharpnessPlot = 2 }
+    internal enum MouseLocation { Outside = 0, IntensityPlot = 1, SharpnessPlot = 2 }
 
-    public class EventPoint : IComparable<EventPoint>
+    internal class EventPoint : IComparable<EventPoint>
     {
         public float Time;
         public float Value;
@@ -32,8 +32,7 @@ namespace Chroma.Haptics.EditorWindow
         public static implicit operator Vector2(EventPoint point) => new Vector2(point.Time, point.Value);
     }
 
-    [Serializable]
-    public abstract class HapticEvent : IComparable<HapticEvent>
+    internal abstract class HapticEvent : IComparable<HapticEvent>
     {
         public abstract float Time { get; }
 
@@ -50,11 +49,10 @@ namespace Chroma.Haptics.EditorWindow
 
         public abstract bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location);
 
-        internal abstract List<Pattern> ToAHAP();
+        public abstract List<Pattern> ToAHAP();
     }
 
-    [Serializable]
-    public class TransientEvent : HapticEvent
+    internal class TransientEvent : HapticEvent
     {
         public EventPoint Intensity;
         public EventPoint Sharpness;
@@ -108,21 +106,19 @@ namespace Chroma.Haptics.EditorWindow
 
         public override bool ShouldRemoveEventAfterRemovingPoint(EventPoint pointToRemove, MouseLocation location) => true;
 
-        internal override List<Pattern> ToAHAP()
+        public override List<Pattern> ToAHAP()
         {
             Event e = new(Time, JsonAHAP.EVENT_TRANSIENT, null, Intensity.Value, Sharpness.Value);
             return new List<Pattern>() { new Pattern(e, null) };
         }
     }
 
-    [Serializable]
-    public class ContinuousEvent : HapticEvent
+    internal class ContinuousEvent : HapticEvent
     {
         public List<EventPoint> IntensityCurve;
         public List<EventPoint> SharpnessCurve;
 
         public override float Time => IntensityCurve?.FirstOrDefault()?.Time ?? 0;
-        public float TimeMax => IntensityCurve?.LastOrDefault()?.Time ?? 0;
 
         public ContinuousEvent() { }
 
@@ -196,7 +192,7 @@ namespace Chroma.Haptics.EditorWindow
             return false;
         }
 
-        internal override List<Pattern> ToAHAP()
+        public override List<Pattern> ToAHAP()
         {
             List<Pattern> list = new();
 
